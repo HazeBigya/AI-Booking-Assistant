@@ -1,6 +1,32 @@
-node_modules
-.next
+# Dependencies
+/node_modules
+
+# Next.js build output
+/.next
+/out
+next-env.d.ts
+
+# Production build
+/build
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Local env (keep .env.example checked in)
 .env
 .env.local
-next-env.d.ts
+.env.*.local
+
+# Test / coverage output
+/coverage
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS cruft
+.DS_Store
+.idea
+*.swp
