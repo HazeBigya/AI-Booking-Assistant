@@ -12,8 +12,8 @@
 // =============================================================================
 
 import { pool } from "./client";
-import type { Interval } from "../booking/availability";
-import type { ProfessionalLevel } from "../booking/rules";
+import type { Interval } from "@server/domain/booking/availability";
+import type { ProfessionalLevel } from "@server/domain/booking/rules";
 import {
   DoubleBookingError,
   type Booking,
@@ -21,7 +21,7 @@ import {
   type NewBooking,
   type Professional,
   type Service,
-} from "../booking/ports";
+} from "@server/domain/booking/ports";
 
 // Postgres raises this SQLSTATE for an exclusion_constraint violation — i.e.
 // our no_double_booking guard fired. We translate it to the domain error.

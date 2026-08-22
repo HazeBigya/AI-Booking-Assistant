@@ -48,55 +48,88 @@ product failure and will be adversarially tested.
 - Runs with only `OPENAI_API_KEY`. Email/calendar creds are optional; without
   them, OTP prints to the server console and calendar events are logged.
 
-## 4. Module map (vocabulary mapped to Next.js idioms)
+## 4. Module map — explicit backend / frontend split
+
+One Next.js app. Backend lives under `src/server/**`, frontend under
+`src/client/**`. `app/` is routing only. Path aliases: `@server/*` ->
+`src/server/*`, `@client/*` -> `src/client/*`, `@/*` -> repo root. The client
+never imports `@server`; the server never imports `@client`.
+
+### 4.1 Routing (Next.js, thin)
 
 ```
-app/api/chat/route.ts         controller (thin): parse, rate-limit, call service, map errors
-app/api/auth/*/route.ts       controller: request-otp, verify-otp, logout
-app/api/appointments/route.ts controller: list current patient's bookings (auth-gated)
+app/api/chat/route.ts          route -> controllers/chat. parse req, return Response.
+app/api/auth/[action]/route.ts route -> controllers/auth (request-otp, verify-otp, logout)
+app/api/appointments/route.ts  route -> controllers/appointments (auth-gated)
+app/page.tsx, layout.tsx, globals.css
+```
+Routes do no logic: read the request, call a controller, shape the Response.
 
-lib/ai/providers/types.ts     LLMProvider interface + PROVIDER-NEUTRAL message/tool/usage types
-lib/ai/providers/openai.ts    OpenAI adapter (neutral <-> OpenAI wire format)
-lib/ai/providers/index.ts     factory: env LLM_PROVIDER selects the adapter
+### 4.2 Backend — `src/server/**`
 
-lib/ai/guardrails/intent-gate.ts      cheap classify -> enum; out_of_scope short-circuits
-lib/ai/guardrails/system-prompt.ts    strict scope prompt for the main model
-lib/ai/guardrails/output-validator.ts reject code fences / off-topic drift
-lib/ai/guardrails/refusals.ts         canned deterministic refusals
+```
+controllers/          call services, return { data | enum }. NO business logic.
+services/             business logic / orchestration (the "lib")
+  chat.ts             hand-written tool-calling loop (transport-agnostic: text or voice)
+domain/booking/       pure core (rules, availability, ports, scheduler) — imports NOTHING
+                      + new scheduler.findAvailabilityForProfessional()
+sdk/                  external-service clients (each vendor behind an interface)
+  ai/providers/       LLMProvider interface + neutral types; openai.ts adapter; index factory
+  ai/guardrails/      intent-gate, system-prompt, output-validator, refusals
+  ai/tools/           schemas (neutral tool defs) + dispatch (zod-validated -> domain)
+  calendar/           types (CalendarProvider), registry, {google,outlook,zoho,noop}
+  mailer/             send OTP email; console fallback in dev
+db/
+  schema.ts           drizzle table defs
+  client.ts           drizzle(pool)
+  query-wrapper.ts    generic exec wrapper: try/catch, 23P01 -> DoubleBookingError, logging
+  queries/            per-entity query files (booking, patient, otp) — all use query-wrapper
+enums/                fixed response maps, e.g. { NotFound: "Service not found" } as const
+shared/               rate-limit (token-bucket), tokens (usage aggregation), types, helpers
+auth/                 otp (generate/verify, hashed single-use), session (httpOnly JWT)
+```
 
-lib/ai/tools/schemas.ts       neutral tool defs
-lib/ai/tools/dispatch.ts      tool name -> lib/booking call, args validated with zod
-lib/ai/services/chat.ts       hand-written tool-calling loop (transport-agnostic: text or voice)
+### 4.3 Frontend — `src/client/**`
 
-lib/booking/*                 UNCHANGED pure core (rules, availability, ports, scheduler)
-                              + new scheduler.findAvailabilityForProfessional()
+```
+api/                  the ONLY place that talks HTTP. Components never call fetch.
+  http.ts             generic get/post/patch/del (the fetcher) — written once
+  endpoints.ts        endpoint path constants
+  appointments.ts     getAppointments() = get(endpoints.appointments)
+  chat.ts             sendMessage(payload) = post(endpoints.chat, payload)
+  auth.ts             requestOtp/verifyOtp/logout wrappers over http
+components/           feature components (ChatWindow, Message, LoginPanel, AppointmentsList)
+ui/                   presentational primitives (Button, Input, Spinner)
+```
 
-lib/db/schema.ts              drizzle table defs
-lib/db/client.ts              drizzle(pool)
-lib/db/queries.ts             BookingRepository impl via drizzle + patient/otp queries
+### 4.4 Tests / scripts
 
-lib/calendar/types.ts         CalendarProvider interface (createEvent{attendees}, isBusy)
-lib/calendar/registry.ts      name -> adapter map; register()/resolve()
-lib/calendar/{google,outlook,zoho}.ts  adapters (documented stubs, real behind env)
-lib/calendar/noop.ts          dev default: logs the event
-
-lib/auth/otp.ts               generate/verify 6-digit OTP (hashed, single-use, expiry)
-lib/auth/session.ts           sign/verify httpOnly JWT session cookie
-lib/auth/mailer.ts            send OTP email; console fallback in dev
-
-lib/shared/rate-limit.ts      in-memory token-bucket Map<key,...>
-lib/shared/tokens.ts          aggregate usage.total_tokens per-session + global; optional cap
-lib/shared/types.ts           shared cross-cutting types
-lib/shared/helpers.ts         small pure utilities
-
-app/page.tsx, app/layout.tsx, app/globals.css
-components/{ChatWindow,Message,ChatInput,LoginPanel,AppointmentsList}.tsx
-
-tests/booking.test.ts         existing 22 tests (stay green)
-tests/golden/cases.json       scope eval cases {input, expect, note}
+```
+tests/booking.test.ts         existing 22 tests (green after the move)
+tests/golden/cases.json       scope eval cases { input, expect, note }
 tests/golden.test.ts          runs pipeline over cases with a MOCKED provider (offline, CI-safe)
 scripts/eval-live.ts          opt-in: hits the REAL classifier, prints scope accuracy
 ```
+
+Note: sections below that name `lib/...` paths refer to their new homes in this
+tree (`lib/booking` -> `src/server/domain/booking`, `lib/db` ->
+`src/server/db`, `lib/ai` -> `src/server/sdk/ai` + `src/server/services`,
+`lib/calendar` -> `src/server/sdk/calendar`).
+
+## 4b. Code conventions
+
+- **SoC:** route -> controller -> service -> domain/db. Each layer has one job.
+  Controllers only delegate + return; components only render + call `client/api`.
+- **DRY:** one HTTP fetcher (`client/api/http.ts`); one DB `query-wrapper`;
+  fixed strings live in `enums/`, never inlined.
+- **KISS / YAGNI:** no abstraction without a second caller. In-memory over Redis,
+  stubs over real OAuth, until a need is real.
+- **Comments:** minimal. Code + names carry meaning; the "why" lives in this spec.
+  Keep only comments that aid reading (a non-obvious invariant, a gotcha). No
+  banner blocks, no restating the code. Existing teaching-comments are stripped
+  file-by-file as each file's phase touches it.
+- **Provider-neutral seams:** `services/` and `controllers/` depend on `sdk/`
+  interfaces, never a vendor SDK directly.
 
 ## 5. Data model changes
 

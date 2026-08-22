@@ -4,15 +4,15 @@ import {
   overlaps,
   computeAvailableSlots,
   type Interval,
-} from "../lib/booking/availability";
+} from "@server/domain/booking/availability";
 import {
   canLevelPerform,
   isWorkingDay,
   isWithinClinicHours,
   enumerateSlotStarts,
   addMinutes,
-} from "../lib/booking/rules";
-import { createBooking, findAvailability } from "../lib/booking/scheduler";
+} from "@server/domain/booking/rules";
+import { createBooking, findAvailability } from "@server/domain/booking/scheduler";
 import {
   DoubleBookingError,
   type BookingRepository,
@@ -21,7 +21,7 @@ import {
   type Interval as PortInterval,
   type NewBooking,
   type Booking,
-} from "../lib/booking/ports";
+} from "@server/domain/booking/ports";
 
 // Helpers. All times are UTC = clinic-local by our simplification.
 const MON = "2026-08-24"; // Monday, a working day

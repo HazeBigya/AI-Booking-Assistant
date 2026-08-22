@@ -1,9 +1,15 @@
 import { defineConfig } from "vitest/config";
+import { resolve } from "node:path";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@server": resolve(__dirname, "src/server"),
+      "@client": resolve(__dirname, "src/client"),
+      "@": resolve(__dirname, "."),
+    },
+  },
   test: {
-    // Pure Node environment — the booking core has no DOM/React dependency,
-    // which is the whole point: it runs fast and without Docker.
     environment: "node",
     include: ["tests/**/*.test.ts"],
   },
