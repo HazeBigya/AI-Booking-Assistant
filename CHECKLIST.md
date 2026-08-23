@@ -42,12 +42,11 @@ Tracks what's done and what remains. Deadline: Sept 4.
 ## ⬜ Remaining (in priority order)
 
 ### Core gaps
-- [ ] **Chat persistence** — write `chat_sessions`/`chat_messages` (tables exist,
-      unused); mint a uuid cookie, save each turn, load last ~15 for context.
-      *Fixes: chat disappears on refresh.*
-- [ ] **Token usage persistence** — store `totalTokens` per chat turn (on
-      `chat_messages`, or a running total on `chat_sessions`) for cost monitoring
-      (add a `tokens` column when wiring persistence).
+- [x] **Chat persistence** — server-authoritative: `chat_session` uuid cookie,
+      each turn saved to `chat_messages`, last 15 loaded for context, history
+      restored on refresh via GET /api/chat/history.
+- [x] **Token usage persistence** — `chat_messages.tokens` stores per-turn
+      totalTokens on the assistant message (migration 0004).
 - [ ] **OTP rate-limiting** — cap `request_login_code`/`verify_login_code` per email
       (brute-force + spam protection); security hole today
 - [ ] **Price snapshot** — write `bookings.price` at booking time (currently null);

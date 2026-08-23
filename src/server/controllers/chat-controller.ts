@@ -1,49 +1,48 @@
 import { handleChat } from "@server/services/chat-service";
-import type { ChatMessage } from "@server/sdk/ai/providers";
+import { getOrCreateChatSession } from "@server/db/queries/chat";
 import { rateLimit } from "@server/shared/rate-limit";
 
 export interface ControllerResult {
   status: number;
   body: unknown;
-  authenticateAs?: string; // route sets the session cookie for this email
+  authenticateAs?: string; // route sets the auth session cookie for this email
+  chatSessionId?: string; // route sets the chat-session cookie
 }
 
-// Thin: rate-limit, validate input, delegate to the service, shape the response.
-// No business logic lives here.
+// Thin: rate-limit, validate input, resolve the chat session, delegate.
 export async function chatController(input: {
   clientKey: string;
   payload: unknown;
   authedEmail?: string;
+  chatSessionId?: string;
 }): Promise<ControllerResult> {
   if (!rateLimit(input.clientKey).allowed) {
     return { status: 429, body: { error: "Too many requests. Please slow down." } };
   }
 
-  const messages = parseMessages(input.payload);
-  if (!messages) {
-    return { status: 400, body: { error: "Invalid request: expected { messages: [...] }." } };
+  const message = parseMessage(input.payload);
+  if (!message) {
+    return { status: 400, body: { error: "Invalid request: expected { message: string }." } };
   }
 
+  const sessionId = await getOrCreateChatSession(input.chatSessionId);
+
   try {
-    const { reply, totalTokens, authenticateAs } = await handleChat(messages, input.authedEmail);
-    return { status: 200, body: { reply, totalTokens }, authenticateAs };
+    const { reply, totalTokens, authenticateAs } = await handleChat(
+      sessionId,
+      message,
+      input.authedEmail,
+    );
+    return { status: 200, body: { reply, totalTokens }, authenticateAs, chatSessionId: sessionId };
   } catch (err) {
     console.error("chat error:", err);
     return { status: 500, body: { error: "Something went wrong. Please try again." } };
   }
 }
 
-function parseMessages(payload: unknown): ChatMessage[] | null {
+function parseMessage(payload: unknown): string | null {
   if (typeof payload !== "object" || payload === null) return null;
-  const raw = (payload as { messages?: unknown }).messages;
-  if (!Array.isArray(raw)) return null;
-
-  const messages: ChatMessage[] = [];
-  for (const item of raw) {
-    if (typeof item !== "object" || item === null) return null;
-    const { role, content } = item as { role?: unknown; content?: unknown };
-    if ((role !== "user" && role !== "assistant") || typeof content !== "string") return null;
-    messages.push({ role, content });
-  }
-  return messages;
+  const { message } = payload as { message?: unknown };
+  if (typeof message !== "string" || message.trim() === "") return null;
+  return message;
 }

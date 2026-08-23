@@ -18,6 +18,7 @@ export const chatMessages = pgTable(
       .references(() => chatSessions.id, { onDelete: "cascade" }),
     role: text("role").notNull(), // 'user' | 'assistant' | 'tool'
     content: text("content").notNull(),
+    tokens: integer("tokens"), // total tokens for the turn (assistant messages)
     createdAt: tstz("created_at").notNull().defaultNow(),
   },
   (t) => ({

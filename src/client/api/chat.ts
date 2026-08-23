@@ -5,6 +5,13 @@ export interface ChatTurn {
   content: string;
 }
 
-export function sendChat(messages: ChatTurn[]) {
-  return http.post<{ reply: string; totalTokens: number }>("/api/chat", { messages });
+// Send one message; the server holds the conversation (keyed by the chat-session
+// cookie) and returns the assistant's reply.
+export function sendChat(message: string) {
+  return http.post<{ reply: string; totalTokens: number }>("/api/chat", { message });
+}
+
+// Load the persisted conversation for this browser's chat session (survives refresh).
+export function getChatHistory() {
+  return http.get<{ messages: ChatTurn[] }>("/api/chat/history");
 }

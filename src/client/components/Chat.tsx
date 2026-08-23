@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { sendChat, type ChatTurn } from "@client/api/chat";
+import { getChatHistory, sendChat, type ChatTurn } from "@client/api/chat";
 import { getSession, logout, type SessionUser } from "@client/api/auth";
 
 const GREETING: ChatTurn = {
@@ -31,6 +31,12 @@ export function Chat() {
 
   useEffect(() => {
     refreshSession();
+    // Restore the persisted conversation (survives refresh); keep the greeting if empty.
+    getChatHistory()
+      .then((r) => {
+        if (r.messages.length > 0) setMessages(r.messages);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -48,8 +54,7 @@ export function Chat() {
     setError(null);
     setLoading(true);
     try {
-      const history = next.filter((m, i) => !(i === 0 && m === GREETING));
-      const { reply } = await sendChat(history);
+      const { reply } = await sendChat(text); // server holds history; send just the new message
       setMessages([...next, { role: "assistant", content: reply }]);
       refreshSession(); // the patient may have just verified their email in-chat
     } catch (err) {
