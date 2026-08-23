@@ -1,30 +1,37 @@
 import type { ChatRequest, ChatResponse, LLMProvider } from "./types";
 
-// Composes two providers behind the same interface: try primary, fall back to
-// secondary on error (rate limit, outage). Per-call — each request carries full
-// context, so a mid-conversation fallback is safe.
-export function createFallbackProvider(
-  primary: LLMProvider,
-  secondary: LLMProvider,
-): LLMProvider {
+// Tries providers in priority order; returns the first success. Per-call — each
+// request carries full context, so falling through mid-conversation is safe.
+// Throws only if ALL providers fail; the caller then shows a deterministic,
+// honest "can't connect" message rather than a crash.
+export function createFallbackChain(providers: LLMProvider[]): LLMProvider {
+  if (providers.length === 1) return providers[0];
+
   return {
-    name: `${primary.name}->${secondary.name}`,
+    name: providers.map((p) => p.name).join("->"),
 
     async chat(req: ChatRequest): Promise<ChatResponse> {
-      try {
-        return await primary.chat(req);
-      } catch (err) {
-        console.warn(`LLM primary (${primary.name}) failed, falling back to ${secondary.name}:`, err);
-        return secondary.chat(req);
+      let lastError: unknown;
+      for (const provider of providers) {
+        try {
+          return await provider.chat(req);
+        } catch (err) {
+          lastError = err;
+          console.warn(`LLM ${provider.name} failed, trying next:`, err);
+        }
       }
+      throw new Error(`All LLM providers failed: ${String(lastError)}`);
     },
 
     async classify(input: string, labels: string[]): Promise<string> {
-      try {
-        return await primary.classify(input, labels);
-      } catch {
-        return secondary.classify(input, labels);
+      for (const provider of providers) {
+        try {
+          return await provider.classify(input, labels);
+        } catch {
+          // try the next provider
+        }
       }
+      return labels[0]; // gate fails open
     },
   };
 }

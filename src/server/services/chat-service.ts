@@ -35,7 +35,19 @@ export async function handleChat(
   ];
   // ctx is mutated by verify_login_code when the patient authenticates mid-chat.
   const ctx: ToolContext = { authedEmail };
-  const result = await runChat(messages, ctx);
+
+  let result;
+  try {
+    result = await runChat(messages, ctx);
+  } catch (err) {
+    // Every LLM provider in the chain failed — be honest, don't crash.
+    console.error("all LLM providers failed:", err);
+    return {
+      reply:
+        "I'm sorry — I can't reach our booking assistant right now. Please try again in a moment.",
+      totalTokens: 0,
+    };
+  }
 
   return {
     reply: validateOutput(result.reply),

@@ -45,6 +45,9 @@ Tracks what's done and what remains. Deadline: Sept 4.
 - [ ] **Chat persistence** — write `chat_sessions`/`chat_messages` (tables exist,
       unused); mint a uuid cookie, save each turn, load last ~15 for context.
       *Fixes: chat disappears on refresh.*
+- [ ] **Token usage persistence** — store `totalTokens` per chat turn (on
+      `chat_messages`, or a running total on `chat_sessions`) for cost monitoring
+      (add a `tokens` column when wiring persistence).
 - [ ] **OTP rate-limiting** — cap `request_login_code`/`verify_login_code` per email
       (brute-force + spam protection); security hole today
 - [ ] **Price snapshot** — write `bookings.price` at booking time (currently null);
