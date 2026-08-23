@@ -47,11 +47,12 @@ Tracks what's done and what remains. Deadline: Sept 4.
       restored on refresh via GET /api/chat/history.
 - [x] **Token usage persistence** — `chat_messages.tokens` stores per-turn
       totalTokens on the assistant message (migration 0004).
-- [ ] **OTP rate-limiting** — cap `request_login_code`/`verify_login_code` per email
-      (brute-force + spam protection); security hole today
+- [x] **OTP rate-limiting** — per-email caps (3 requests / 5 verifies per 10 min)
+      on `request_login_code`/`verify_login_code` (brute-force + spam protection)
+- [x] **One-command setup** — `npm run setup` (wipe + boot + migrate + seed);
+      `docker compose up` runs the full app + auto migrate/seed for the interviewer
 - [ ] **Price snapshot** — write `bookings.price` at booking time (currently null);
       then tighten `patient_id`/`price` to NOT NULL via a migration
-- [ ] **Gemini model id** — verify correct id so it stops 404-ing (fallback masks it)
 
 ### Quality pass
 - [ ] Consistency/SoC/dead-code sweep across all files (read like one author)
@@ -69,7 +70,9 @@ Tracks what's done and what remains. Deadline: Sept 4.
       in front of `chat()`, TTS (SpeechSynthesis) behind it — no core change
 
 ### Testing + optimization (last)
-- [ ] Broaden tests: tool dispatch (zod validation), guardrails, auth/OTP logic,
+- [x] Tests for recent logic: `.ics` builder, fallback chain, rate limiter,
+      output validator (43 tests total). `npm run setup` runs the suite at the end.
+- [ ] Still to broaden: tool dispatch (zod paths, mocked deps), auth/OTP logic,
       a golden-set eval (mocked provider, CI-safe)
 - [ ] Optimization: token budget cap per session, prompt trimming, query/index
       review, streaming responses, caching where it helps

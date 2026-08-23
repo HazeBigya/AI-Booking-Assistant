@@ -11,7 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/server/db/seed.ts",
-    "db:reset": "bash scripts/reset-db.sh"
+    "setup": "bash scripts/setup.sh"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1116.0",

@@ -8,6 +8,13 @@ import { createBooking, findAvailabilityForProfessional } from "@server/domain/b
 import { createOtp, verifyOtp } from "@server/auth/otp";
 import { findOrCreatePatient } from "@server/auth/patients";
 import { getMailer } from "@server/sdk/mailer";
+import { rateLimit } from "@server/shared/rate-limit";
+
+// OTP abuse limits (per email, 10-min window): cap code requests (inbox spam)
+// and verify attempts (brute-forcing the 6-digit code).
+const OTP_WINDOW_MS = 10 * 60_000;
+const OTP_REQUEST_MAX = 3;
+const OTP_VERIFY_MAX = 5;
 
 // What the model sees. Descriptions guide it; the JSON Schema constrains args.
 export const toolDefs: ToolDef[] = [
@@ -156,6 +163,9 @@ export async function runTool(
     case "request_login_code": {
       const parsed = schemas.request_login_code.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
+      if (!rateLimit(`otp-req:${parsed.data.email}`, { max: OTP_REQUEST_MAX, windowMs: OTP_WINDOW_MS }).allowed) {
+        return errorResult("Too many code requests for that email. Please wait a few minutes.");
+      }
       const code = await createOtp(parsed.data.email);
       try {
         await getMailer().sendOtp(parsed.data.email, code);
@@ -172,6 +182,9 @@ export async function runTool(
     case "verify_login_code": {
       const parsed = schemas.verify_login_code.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
+      if (!rateLimit(`otp-verify:${parsed.data.email}`, { max: OTP_VERIFY_MAX, windowMs: OTP_WINDOW_MS }).allowed) {
+        return JSON.stringify({ ok: false, message: "Too many attempts. Please request a new code and wait a few minutes." });
+      }
       // Deterministic check — the model only relays the code; it never decides.
       if (!(await verifyOtp(parsed.data.email, parsed.data.code))) {
         return JSON.stringify({ ok: false, message: "That code is invalid or expired." });

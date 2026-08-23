@@ -15,4 +15,7 @@ npm run db:migrate
 echo "→ Loading clinic data (dentists, services)..."
 npm run db:seed
 
-echo "✓ Setup complete. Now run: npm run dev"
+echo "→ Running tests to verify everything..."
+npm test
+
+echo "✓ Setup complete and verified. Now run: npm run dev"
