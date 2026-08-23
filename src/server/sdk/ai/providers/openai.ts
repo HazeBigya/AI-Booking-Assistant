@@ -59,11 +59,10 @@ export function createOpenAIProvider(cfg: OpenAIAdapterConfig): LLMProvider {
           { role: "user", content: input },
         ],
       });
-      const raw = res.choices[0].message.content?.trim().toLowerCase() ?? "";
-      const match = labels.find((l) => l.toLowerCase() === raw);
-      // Unknown/garbled output fails safe to the last label (by convention, the
-      // caller passes the "out_of_scope"/refusal label last).
-      return match ?? labels[labels.length - 1];
+      const raw = (res.choices[0].message.content ?? "").toLowerCase();
+      // Substring match (model may add punctuation/words). No clear match -> the
+      // FIRST label: the caller orders its safe default first (gate = fail-open).
+      return labels.find((l) => raw.includes(l.toLowerCase())) ?? labels[0];
     },
   };
 }

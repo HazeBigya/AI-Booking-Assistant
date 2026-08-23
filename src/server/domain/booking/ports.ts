@@ -48,6 +48,9 @@ export interface BookingRepository {
   getServiceByCode(code: string): Promise<Service | null>;
   listProfessionalsForService(serviceId: number): Promise<Professional[]>;
   getBookingsForProfessionalOnDay(professionalId: number, day: Date): Promise<Interval[]>;
+  // A patient's own booked appointments that day — used to stop a patient being
+  // double-booked across dentists.
+  getBookingsForPatientOnDay(patientEmail: string, day: Date): Promise<Interval[]>;
   // MUST throw DoubleBookingError if the exclusion constraint fires.
   insertBooking(booking: NewBooking): Promise<Booking>;
 }

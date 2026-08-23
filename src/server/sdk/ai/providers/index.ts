@@ -1,3 +1,4 @@
+import { createBedrockProvider } from "./bedrock";
 import { createOpenAIProvider } from "./openai";
 import type { LLMProvider } from "./types";
 
@@ -36,8 +37,15 @@ export function getLLMProvider(): LLMProvider {
         model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
       });
       break;
+    case "bedrock":
+      // Credentials via the standard AWS chain (env/role), not an API key.
+      cached = createBedrockProvider({
+        region: process.env.AWS_REGION ?? "us-east-1",
+        modelId: requireEnv("BEDROCK_MODEL_ID"),
+      });
+      break;
     default:
-      throw new Error(`Unknown LLM_PROVIDER "${provider}". Use "openai" or "deepseek".`);
+      throw new Error(`Unknown LLM_PROVIDER "${provider}". Use "openai", "deepseek", or "bedrock".`);
   }
   return cached;
 }

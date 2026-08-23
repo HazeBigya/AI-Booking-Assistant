@@ -35,6 +35,30 @@ export async function getBookingsForProfessionalOnDay(
   return rows.map((r) => ({ start: r.start, end: r.end }));
 }
 
+export async function getBookingsForPatientOnDay(
+  patientEmail: string,
+  day: Date,
+): Promise<Interval[]> {
+  const dayStart = new Date(day);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const nextDay = new Date(dayStart);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+  const rows = await db
+    .select({ start: bookings.startTime, end: bookings.endTime })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.patientEmail, patientEmail),
+        eq(bookings.status, "booked"),
+        gte(bookings.startTime, dayStart),
+        lt(bookings.startTime, nextDay),
+      ),
+    )
+    .orderBy(bookings.startTime);
+  return rows.map((r) => ({ start: r.start, end: r.end }));
+}
+
 export async function insertBooking(b: NewBooking): Promise<Booking> {
   try {
     const rows = await db

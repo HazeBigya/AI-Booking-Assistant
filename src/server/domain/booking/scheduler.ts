@@ -57,7 +57,7 @@ export async function findAvailability(
 // tool, after the patient has chosen a specific dentist.
 export async function findAvailabilityForProfessional(
   repo: BookingRepository,
-  input: { serviceCode: string; professionalId: number; day: Date },
+  input: { serviceCode: string; professionalId: number; day: Date; patientEmail?: string },
 ): Promise<
   { service: Service; professional: Professional; slots: Date[] } | { error: string }
 > {
@@ -74,23 +74,36 @@ export async function findAvailabilityForProfessional(
     professional.id,
     input.day,
   );
-  const slots = computeAvailableSlots({
+  let slots = computeAvailableSlots({
     day: input.day,
     durationMin: service.durationMinutes,
     existingBookings,
   });
+
+  // If we know the patient, hide slots that clash with their own appointments.
+  if (input.patientEmail) {
+    const patientBookings = await repo.getBookingsForPatientOnDay(input.patientEmail, input.day);
+    slots = slots.filter((start) => {
+      const candidate: Interval = { start, end: addMinutes(start, service.durationMinutes) };
+      return !patientBookings.some((b) => overlaps(candidate, b));
+    });
+  }
+
   return { service, professional, slots };
 }
 
 export type BookingResult =
-  | { ok: true; booking: Booking }
+  // Includes the resolved professional + service so the confirmation is grounded
+  // in what was actually booked, not the model's memory.
+  | { ok: true; booking: Booking; professional: Professional; service: Service }
   | { ok: false; reason: BookingRejectionReason; message: string };
 
 export type BookingRejectionReason =
   | "unknown_service"
   | "outside_hours"
   | "not_qualified"
-  | "slot_taken";
+  | "slot_taken"
+  | "patient_busy";
 
 export async function createBooking(
   repo: BookingRepository,
@@ -145,6 +158,16 @@ export async function createBooking(
     };
   }
 
+  // The patient must be free too — no booking them into two overlapping slots.
+  const patientBookings = await repo.getBookingsForPatientOnDay(input.patientEmail, input.start);
+  if (patientBookings.some((b) => overlaps(candidate, b))) {
+    return {
+      ok: false,
+      reason: "patient_busy",
+      message: "You already have an appointment that overlaps this time.",
+    };
+  }
+
   // The exclusion constraint is the real guarantee under a race: one insert
   // wins, the other throws DoubleBookingError -> same friendly result.
   try {
@@ -156,7 +179,7 @@ export async function createBooking(
       patientName: input.patientName,
       patientEmail: input.patientEmail,
     });
-    return { ok: true, booking };
+    return { ok: true, booking, professional, service };
   } catch (err) {
     if (err instanceof DoubleBookingError) {
       return {

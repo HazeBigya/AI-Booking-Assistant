@@ -6,3 +6,4 @@ export * from "./professional-services";
 export * from "./patients";
 export * from "./bookings";
 export * from "./chat";
+export * from "./otp";

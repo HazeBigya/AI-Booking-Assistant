@@ -179,6 +179,12 @@ class FakeRepo implements BookingRepository {
       .filter((b) => b.professionalId === professionalId && b.start.toISOString().slice(0, 10) === ymd)
       .map((b) => ({ start: b.start, end: b.end }));
   }
+  async getBookingsForPatientOnDay(patientEmail: string, day: Date): Promise<PortInterval[]> {
+    const ymd = day.toISOString().slice(0, 10);
+    return this.bookings
+      .filter((b) => b.patientEmail === patientEmail && b.start.toISOString().slice(0, 10) === ymd)
+      .map((b) => ({ start: b.start, end: b.end }));
+  }
   async insertBooking(b: NewBooking): Promise<Booking> {
     if (this.simulateRace) throw new DoubleBookingError();
     const booking: Booking = { ...b, id: this.nextId++ };
@@ -248,6 +254,20 @@ describe("scheduler.createBooking", () => {
     const res = await createBooking(repo, { ...base, start: at(MON, "09:00") });
     expect(res).toMatchObject({ ok: false, reason: "slot_taken" });
   });
+
+  it("refuses when the patient already has an overlapping booking", async () => {
+    const repo = makeRepo();
+    // Patient books SENIOR 09:00-10:00.
+    const first = await createBooking(repo, { ...base, start: at(MON, "09:00") });
+    expect(first.ok).toBe(true);
+    // Same patient, different (free) dentist, overlapping time -> patient is busy.
+    const second = await createBooking(repo, {
+      ...base,
+      professionalId: JUNIOR.id,
+      start: at(MON, "09:30"),
+    });
+    expect(second).toMatchObject({ ok: false, reason: "patient_busy" });
+  });
 });
 
 describe("scheduler.findAvailability", () => {
@@ -310,6 +330,31 @@ describe("scheduler.findAvailabilityForProfessional", () => {
       day: at(MON, "00:00"),
     });
     expect(res).toMatchObject({ error: expect.any(String) });
+  });
+
+  it("excludes slots that clash with the patient's own bookings", async () => {
+    const repo = makeRepo();
+    // Patient books SENIOR 09:00-10:00, then checks the JUNIOR's slots.
+    await createBooking(repo, {
+      serviceCode: "A",
+      professionalId: SENIOR.id,
+      patientName: "Pat",
+      patientEmail: "pat@example.com",
+      start: at(MON, "09:00"),
+    });
+    const res = await findAvailabilityForProfessional(repo, {
+      serviceCode: "A",
+      professionalId: JUNIOR.id,
+      day: at(MON, "00:00"),
+      patientEmail: "pat@example.com",
+    });
+    expect("error" in res).toBe(false);
+    if (!("error" in res)) {
+      const iso = res.slots.map((s) => s.toISOString());
+      expect(iso).not.toContain(at(MON, "09:00").toISOString()); // patient busy
+      expect(iso).not.toContain(at(MON, "09:30").toISOString()); // overlaps 09:00-10:00
+      expect(iso).toContain(at(MON, "10:00").toISOString()); // clear
+    }
   });
 });
 

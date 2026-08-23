@@ -13,12 +13,18 @@
     "db:seed": "tsx src/server/db/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1116.0",
+    "@tailwindcss/typography": "^0.5.20",
     "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.10",
     "next": "14.2.5",
     "openai": "^4.56.0",
     "pg": "^8.12.0",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
