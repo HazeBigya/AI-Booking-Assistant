@@ -15,7 +15,7 @@ export const professionalServices = pgTable(
       .references(() => services.id, { onDelete: "cascade" }),
     expertiseNote: text("expertise_note"),
     proficiency: smallint("proficiency"), // optional 1–5, for honest ranking
-    priceCents: integer("price_cents"), // per-dentist override; NULL = use base
+    priceOverride: integer("price_override"), // per-dentist dollars; NULL = use base
   },
   (t) => ({
     pk: primaryKey({ columns: [t.professionalId, t.serviceId] }),

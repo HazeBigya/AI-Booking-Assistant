@@ -1,6 +1,6 @@
 {
-  "id": "4cf2058e-eadc-4298-a901-5bbb71a5d5ba",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "a41a99a0-1f31-41ee-98ee-90fb174daee8",
+  "prevId": "4cf2058e-eadc-4298-a901-5bbb71a5d5ba",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -112,10 +112,10 @@
       "uniqueConstraints": {
         "services_code_unique": {
           "name": "services_code_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "code"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -171,28 +171,28 @@
         "professional_services_professional_id_professionals_id_fk": {
           "name": "professional_services_professional_id_professionals_id_fk",
           "tableFrom": "professional_services",
-          "tableTo": "professionals",
           "columnsFrom": [
             "professional_id"
           ],
+          "tableTo": "professionals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "professional_services_service_id_services_id_fk": {
           "name": "professional_services_service_id_services_id_fk",
           "tableFrom": "professional_services",
-          "tableTo": "services",
           "columnsFrom": [
             "service_id"
           ],
+          "tableTo": "services",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -245,10 +245,10 @@
       "uniqueConstraints": {
         "patients_email_unique": {
           "name": "patients_email_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -346,50 +346,50 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "bookings_patient_id_patients_id_fk": {
           "name": "bookings_patient_id_patients_id_fk",
           "tableFrom": "bookings",
-          "tableTo": "patients",
           "columnsFrom": [
             "patient_id"
           ],
+          "tableTo": "patients",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "bookings_professional_id_professionals_id_fk": {
           "name": "bookings_professional_id_professionals_id_fk",
           "tableFrom": "bookings",
-          "tableTo": "professionals",
           "columnsFrom": [
             "professional_id"
           ],
+          "tableTo": "professionals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "bookings_service_id_services_id_fk": {
           "name": "bookings_service_id_services_id_fk",
           "tableFrom": "bookings",
-          "tableTo": "services",
           "columnsFrom": [
             "service_id"
           ],
+          "tableTo": "services",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -461,24 +461,24 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "chat_messages_session_id_chat_sessions_id_fk": {
           "name": "chat_messages_session_id_chat_sessions_id_fk",
           "tableFrom": "chat_messages",
-          "tableTo": "chat_sessions",
           "columnsFrom": [
             "session_id"
           ],
+          "tableTo": "chat_sessions",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -522,15 +522,15 @@
         "chat_sessions_patient_id_patients_id_fk": {
           "name": "chat_sessions_patient_id_patients_id_fk",
           "tableFrom": "chat_sessions",
-          "tableTo": "patients",
           "columnsFrom": [
             "patient_id"
           ],
+          "tableTo": "patients",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -542,10 +542,10 @@
   },
   "enums": {},
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

@@ -9,10 +9,10 @@ export const services = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull(),
     durationMinutes: integer("duration_minutes").notNull(),
-    basePriceCents: integer("base_price_cents").notNull(),
+    basePrice: integer("base_price").notNull(), // whole dollars (integer, not float)
   },
   (t) => ({
     durationPositive: check("services_duration_positive", sql`${t.durationMinutes} > 0`),
-    pricePositive: check("services_price_nonneg", sql`${t.basePriceCents} >= 0`),
+    pricePositive: check("services_price_nonneg", sql`${t.basePrice} >= 0`),
   }),
 );

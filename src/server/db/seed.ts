@@ -19,35 +19,35 @@ async function seed() {
         name: "Routine Checkup",
         description: "A general dental exam and consultation to check overall oral health.",
         durationMinutes: 60,
-        basePriceCents: 7500,
+        basePrice: 50,
       },
       {
         code: "B",
         name: "Teeth Whitening",
         description: "A cosmetic treatment that lightens stains and brightens the teeth.",
         durationMinutes: 60,
-        basePriceCents: 12000,
+        basePrice: 100,
       },
       {
         code: "C",
         name: "Cavity Filling",
         description: "Removal of decay and restoration of the tooth with a filling.",
         durationMinutes: 150,
-        basePriceCents: 25000,
+        basePrice: 150,
       },
       {
         code: "D",
         name: "Root Canal",
         description: "Treatment of an infected tooth pulp to save the natural tooth.",
         durationMinutes: 120,
-        basePriceCents: 90000,
+        basePrice: 200,
       },
       {
         code: "E",
         name: "Full Mouth Restoration",
         description: "A comprehensive multi-stage rebuild of the full set of teeth.",
         durationMinutes: 360,
-        basePriceCents: 500000,
+        basePrice: 400,
       },
     ])
     .returning({ id: services.id, code: services.code });
@@ -78,13 +78,13 @@ async function seed() {
     .returning({ id: professionals.id, name: professionals.name });
   const proId = Object.fromEntries(pros.map((p) => [p.name, p.id])) as Record<string, number>;
 
-  // proficiency 1–5; priceCents overrides the service base when set.
+  // proficiency 1–5; priceOverride (dollars) overrides the service base when set.
   const mappings: {
     pro: string;
     code: string;
     proficiency: number;
     note: string;
-    priceCents?: number;
+    priceOverride?: number;
   }[] = [
     // John (junior): A, B only.
     { pro: "John", code: "A", proficiency: 3, note: "Comfortable with routine checkups." },
@@ -102,7 +102,7 @@ async function seed() {
       code: "B",
       proficiency: 5,
       note: "Lead cosmetic dentist; whitening is her focus.",
-      priceCents: 18000,
+      priceOverride: 150,
     },
     { pro: "Kate", code: "C", proficiency: 4, note: "Skilled with fillings." },
     { pro: "Kate", code: "D", proficiency: 4, note: "Performs root canals." },
@@ -115,7 +115,7 @@ async function seed() {
       serviceId: serviceId[m.code],
       proficiency: m.proficiency,
       expertiseNote: m.note,
-      priceCents: m.priceCents ?? null,
+      priceOverride: m.priceOverride ?? null,
     })),
   );
 

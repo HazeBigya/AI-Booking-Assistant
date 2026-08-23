@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1787462798763,
-      "tag": "0000_exotic_ulik",
+      "when": 1787464086371,
+      "tag": "0000_init_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787464087254,
+      "tag": "0001_double_booking_guard",
       "breakpoints": true
     }
   ]

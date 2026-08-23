@@ -1,6 +1,8 @@
 -- Double-booking guard. Drizzle's schema DSL can't express an exclusion
 -- constraint, so it lives here as reviewed custom SQL.
 
+-- btree_gist lets one GiST index mix scalar equality (professional_id) with a
+-- range-overlap check in the same EXCLUDE constraint.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- Reject any new booking whose [start,end) range overlaps (&&) an existing one

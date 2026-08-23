@@ -22,7 +22,7 @@ export const bookings = pgTable(
     startTime: tstz("start_time").notNull(),
     endTime: tstz("end_time").notNull(),
     status: text("status").notNull().default("booked"), // 'booked' | 'cancelled'
-    priceCents: integer("price_cents"), // snapshot at booking time (nullable for now)
+    price: integer("price"), // whole-dollar snapshot at booking time (nullable for now)
     patientName: text("patient_name").notNull(),
     patientEmail: text("patient_email").notNull(),
     createdAt: tstz("created_at").notNull().defaultNow(),
