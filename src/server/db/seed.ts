@@ -63,18 +63,21 @@ async function seed() {
     .values([
       {
         name: "John",
+        email: "bigyatuladhar07@gmail.com", // dummy dentist inbox (demo)
         title: "Junior Dentist",
         level: "junior",
         bio: "Junior dentist, 3 years' experience. Handles routine checkups and whitening.",
       },
       {
         name: "Oscar",
+        email: "bigyatuladhar07@gmail.com",
         title: "Senior Dentist",
         level: "senior",
         bio: "Senior dentist, 15 years' experience. Focus on restorative work: fillings, root canals, full restorations.",
       },
       {
         name: "Kate",
+        email: "bigyatuladhar07@gmail.com",
         title: "Senior Dentist",
         level: "senior",
         bio: "Senior dentist, 12 years' experience. Lead cosmetic dentist; whitening and aesthetics are her focus.",

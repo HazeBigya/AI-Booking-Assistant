@@ -6,6 +6,7 @@ export const professionals = pgTable(
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
+    email: text("email").notNull().default(""), // for calendar invites
     title: text("title").notNull(), // 'Junior Dentist' | 'Senior Dentist'
     level: text("level").notNull(), // 'junior' | 'senior' — drives capability
     bio: text("bio").notNull(),

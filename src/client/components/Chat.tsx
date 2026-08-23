@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { sendChat, type ChatTurn } from "@client/api/chat";
-import { LoginPanel } from "./LoginPanel";
+import { getSession, logout, type SessionUser } from "@client/api/auth";
 
 const GREETING: ChatTurn = {
   role: "assistant",
@@ -16,8 +16,22 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<SessionUser | null>(null);
   const sending = useRef(false); // synchronous guard against double-submit
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Refocus the input once it re-enables, so you can type the next message
+  // without clicking back into the box.
+  useEffect(() => {
+    if (!loading) inputRef.current?.focus();
+  }, [loading]);
+
+  const refreshSession = () => getSession().then((r) => setMe(r.session)).catch(() => {});
+
+  useEffect(() => {
+    refreshSession();
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,6 +51,7 @@ export function Chat() {
       const history = next.filter((m, i) => !(i === 0 && m === GREETING));
       const { reply } = await sendChat(history);
       setMessages([...next, { role: "assistant", content: reply }]);
+      refreshSession(); // the patient may have just verified their email in-chat
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -50,8 +65,21 @@ export function Chat() {
       <header className="flex items-center border-b bg-white px-4 py-3">
         <span className="flex-1" />
         <span className="font-semibold text-slate-800">🦷 Bright Smile Clinic</span>
-        <span className="flex flex-1 justify-end">
-          <LoginPanel />
+        <span className="flex flex-1 justify-end text-xs">
+          {me && (
+            <span className="flex items-center gap-2">
+              <span className="text-slate-500">{me.name}</span>
+              <button
+                className="text-blue-600"
+                onClick={async () => {
+                  await logout();
+                  setMe(null);
+                }}
+              >
+                Log out
+              </button>
+            </span>
+          )}
         </span>
       </header>
 
@@ -81,6 +109,8 @@ export function Chat() {
 
       <div className="mx-auto flex w-full max-w-2xl gap-2 p-4">
         <input
+          ref={inputRef}
+          autoFocus
           className="flex-1 rounded-full border px-4 py-2 text-sm outline-none focus:border-blue-500"
           placeholder="Type a message…"
           value={input}

@@ -1,0 +1,1 @@
+ALTER TABLE "professionals" ADD COLUMN "email" text DEFAULT '' NOT NULL;

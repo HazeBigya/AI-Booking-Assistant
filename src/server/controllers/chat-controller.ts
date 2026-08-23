@@ -5,6 +5,7 @@ import { rateLimit } from "@server/shared/rate-limit";
 export interface ControllerResult {
   status: number;
   body: unknown;
+  authenticateAs?: string; // route sets the session cookie for this email
 }
 
 // Thin: rate-limit, validate input, delegate to the service, shape the response.
@@ -24,8 +25,8 @@ export async function chatController(input: {
   }
 
   try {
-    const { reply, totalTokens } = await handleChat(messages, input.authedEmail);
-    return { status: 200, body: { reply, totalTokens } };
+    const { reply, totalTokens, authenticateAs } = await handleChat(messages, input.authedEmail);
+    return { status: 200, body: { reply, totalTokens }, authenticateAs };
   } catch (err) {
     console.error("chat error:", err);
     return { status: 500, body: { error: "Something went wrong. Please try again." } };

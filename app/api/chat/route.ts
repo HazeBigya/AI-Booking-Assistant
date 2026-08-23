@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { chatController } from "@server/controllers/chat-controller";
-import { SESSION_COOKIE, readSessionToken } from "@server/auth/session";
+import { SESSION_COOKIE, createSessionToken, readSessionToken } from "@server/auth/session";
 
 export async function POST(req: NextRequest) {
   const clientKey = req.headers.get("x-forwarded-for") ?? "local";
@@ -13,10 +13,25 @@ export async function POST(req: NextRequest) {
     payload = null;
   }
 
-  const { status, body } = await chatController({
+  const { status, body, authenticateAs } = await chatController({
     clientKey,
     payload,
     authedEmail: session?.email,
   });
-  return NextResponse.json(body, { status });
+
+  const res = NextResponse.json(body, { status });
+  // Patient verified their email in-chat this turn -> persist the session.
+  if (authenticateAs) {
+    const token = await createSessionToken({
+      email: authenticateAs,
+      name: authenticateAs.split("@")[0],
+    });
+    res.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+  }
+  return res;
 }

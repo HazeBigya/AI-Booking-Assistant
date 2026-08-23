@@ -2,10 +2,14 @@ import { type ChatMessage } from "@server/sdk/ai/providers";
 import { runChat } from "@server/sdk/ai/chat";
 import { validateOutput } from "@server/sdk/ai/guardrails";
 import { SYSTEM_PROMPT } from "@server/sdk/ai/prompt";
+import type { ToolContext } from "@server/sdk/ai/tools";
 
 export interface ChatReply {
   reply: string;
   totalTokens: number;
+  // Set when the patient verified their email this turn — the route persists a
+  // session cookie for this address.
+  authenticateAs?: string;
 }
 
 // Guardrails around the tool-calling loop:
@@ -21,16 +25,23 @@ export async function handleChat(
   authedEmail?: string,
 ): Promise<ChatReply> {
   const authLine = authedEmail
-    ? `The patient is logged in as ${authedEmail}; get_my_appointments will use this identity.`
-    : `The patient is not logged in. If they ask to see their appointments, tell them to log in first.`;
+    ? `The patient is logged in as ${authedEmail}; booking and get_my_appointments use this identity.`
+    : `The patient is NOT logged in. To book or view appointments, verify their email first ` +
+      `(collect email -> request_login_code -> ask for the code -> verify_login_code).`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: `${SYSTEM_PROMPT}\n\n${currentDateLine()}\n${authLine}` },
     ...history,
   ];
-  const result = await runChat(messages, { authedEmail });
+  // ctx is mutated by verify_login_code when the patient authenticates mid-chat.
+  const ctx: ToolContext = { authedEmail };
+  const result = await runChat(messages, ctx);
 
-  return { reply: validateOutput(result.reply), totalTokens: result.totalTokens };
+  return {
+    reply: validateOutput(result.reply),
+    totalTokens: result.totalTokens,
+    authenticateAs: ctx.authenticatedAs,
+  };
 }
 
 // Clinic time is UTC by our simplification, so read the date in UTC.

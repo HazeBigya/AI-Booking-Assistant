@@ -39,11 +39,20 @@ services:
       # `db` is the compose service name = DNS hostname on the shared network.
       DATABASE_URL: postgres://clinic:clinic@db:5432/clinic
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_FALLBACK: ${LLM_FALLBACK:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       AUTH_SECRET: ${AUTH_SECRET:-dev-only-insecure-secret-change-me}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-onboarding@resend.dev}
       HOSTNAME: "0.0.0.0"
     ports:
       - "3000:3000"
