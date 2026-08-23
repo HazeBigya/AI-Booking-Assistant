@@ -38,8 +38,11 @@ services:
     environment:
       # `db` is the compose service name = DNS hostname on the shared network.
       DATABASE_URL: postgres://clinic:clinic@db:5432/clinic
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       HOSTNAME: "0.0.0.0"
     ports:
       - "3000:3000"

@@ -17,35 +17,40 @@ async function seed() {
       {
         code: "A",
         name: "Routine Checkup",
-        description: "A general dental exam and consultation to check overall oral health.",
+        description:
+          "A general dental exam where the dentist checks your teeth and gums for any issues. Includes a consultation and advice on keeping your mouth healthy.",
         durationMinutes: 60,
         basePrice: 50,
       },
       {
         code: "B",
         name: "Teeth Whitening",
-        description: "A cosmetic treatment that lightens stains and brightens the teeth.",
+        description:
+          "A cosmetic treatment that lightens stains and discoloration to brighten your smile. A popular option before events or for anyone wanting whiter teeth.",
         durationMinutes: 60,
         basePrice: 100,
       },
       {
         code: "C",
         name: "Cavity Filling",
-        description: "Removal of decay and restoration of the tooth with a filling.",
+        description:
+          "The dentist removes decay from a tooth and fills the space to restore it. This stops the cavity from getting worse and relieves discomfort.",
         durationMinutes: 150,
         basePrice: 150,
       },
       {
         code: "D",
         name: "Root Canal",
-        description: "Treatment of an infected tooth pulp to save the natural tooth.",
+        description:
+          "Treatment for a tooth with an infected or damaged inner pulp, cleaning it out to save the natural tooth. It relieves pain and avoids extraction.",
         durationMinutes: 120,
         basePrice: 200,
       },
       {
         code: "E",
         name: "Full Mouth Restoration",
-        description: "A comprehensive multi-stage rebuild of the full set of teeth.",
+        description:
+          "A comprehensive, multi-stage treatment that rebuilds or replaces the full set of teeth. Best for extensive damage or wear across the whole mouth.",
         durationMinutes: 360,
         basePrice: 400,
       },
