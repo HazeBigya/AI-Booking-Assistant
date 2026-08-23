@@ -1,17 +1,5 @@
-// =============================================================================
-// Orchestration: turn a request into a validated booking.
-//
-// This is what the AI layer calls as a "tool". It is deterministic and it
-// trusts the model for NOTHING — every rule is re-checked here in code:
-//   1. the service exists
-//   2. the time is inside clinic hours
-//   3. the professional is actually allowed to perform the service
-//   4. the slot does not overlap an existing booking (app-level check)
-//   5. the DB exclusion constraint is the final backstop (step 4 can race)
-//
-// It depends only on the BookingRepository PORT (ports.ts), never on a concrete
-// database — so it is fully testable with an in-memory fake.
-// =============================================================================
+// Orchestration the AI calls as tools. Deterministic; trusts the model for
+// nothing — every rule is re-checked here against the BookingRepository port.
 
 import { computeAvailableSlots, overlaps, type Interval } from "./availability";
 import { isWithinClinicHours, addMinutes } from "./rules";
@@ -33,11 +21,12 @@ export interface Availability {
   options: AvailabilityOption[];
 }
 
-/**
- * For a service on a given day, what can each capable professional offer?
- * Returns per-professional free slots. Empty options => no one can do it that
- * day (either nobody is qualified or everyone is fully booked).
- */
+export function listServices(repo: BookingRepository): Promise<Service[]> {
+  return repo.listServices();
+}
+
+// Per-professional free slots for a service on a day. Empty options => nobody
+// qualified, or everyone fully booked.
 export async function findAvailability(
   repo: BookingRepository,
   input: { serviceCode: string; day: Date },
@@ -64,7 +53,35 @@ export async function findAvailability(
   return { service, options };
 }
 
-// Discriminated union so callers must handle both outcomes explicitly.
+// One dentist's free slots for a service on a day. Backs the check_availability
+// tool, after the patient has chosen a specific dentist.
+export async function findAvailabilityForProfessional(
+  repo: BookingRepository,
+  input: { serviceCode: string; professionalId: number; day: Date },
+): Promise<
+  { service: Service; professional: Professional; slots: Date[] } | { error: string }
+> {
+  const service = await repo.getServiceByCode(input.serviceCode);
+  if (!service) return { error: `Unknown service code "${input.serviceCode}".` };
+
+  const professionals = await repo.listProfessionalsForService(service.id);
+  const professional = professionals.find((p) => p.id === input.professionalId);
+  if (!professional) {
+    return { error: "That professional cannot perform the requested service." };
+  }
+
+  const existingBookings = await repo.getBookingsForProfessionalOnDay(
+    professional.id,
+    input.day,
+  );
+  const slots = computeAvailableSlots({
+    day: input.day,
+    durationMin: service.durationMinutes,
+    existingBookings,
+  });
+  return { service, professional, slots };
+}
+
 export type BookingResult =
   | { ok: true; booking: Booking }
   | { ok: false; reason: BookingRejectionReason; message: string };
@@ -96,7 +113,6 @@ export async function createBooking(
 
   const end = addMinutes(input.start, service.durationMinutes);
 
-  // (2) Clinic hours.
   if (!isWithinClinicHours(input.start, end)) {
     return {
       ok: false,
@@ -105,7 +121,6 @@ export async function createBooking(
     };
   }
 
-  // (3) Is THIS professional allowed to perform THIS service?
   const professionals = await repo.listProfessionalsForService(service.id);
   const professional = professionals.find((p) => p.id === input.professionalId);
   if (!professional) {
@@ -116,7 +131,7 @@ export async function createBooking(
     };
   }
 
-  // (4) App-level overlap check — for a friendly message before we hit the DB.
+  // App-level overlap check: friendly message before hitting the DB.
   const existingBookings = await repo.getBookingsForProfessionalOnDay(
     professional.id,
     input.start,
@@ -130,9 +145,8 @@ export async function createBooking(
     };
   }
 
-  // (5) Insert. The DB exclusion constraint is the real guarantee: if two
-  // requests raced past check (4), exactly one insert succeeds; the other
-  // throws DoubleBookingError, which we convert to the same friendly result.
+  // The exclusion constraint is the real guarantee under a race: one insert
+  // wins, the other throws DoubleBookingError -> same friendly result.
   try {
     const booking = await repo.insertBooking({
       professionalId: professional.id,

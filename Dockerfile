@@ -5,6 +5,15 @@ COPY package.json package-lock.json* ./
 # Use npm ci when a lockfile exists (reproducible), else fall back to install.
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
+# ---- migrator: applies migrations + seed once, then exits (has dev deps) ----
+FROM node:20-alpine AS migrator
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json tsconfig.json drizzle.config.ts ./
+COPY drizzle ./drizzle
+COPY src ./src
+CMD ["sh", "-c", "npm run db:migrate && npm run db:seed"]
+
 # ---- builder: compile the Next.js app ----
 FROM node:20-alpine AS builder
 WORKDIR /app

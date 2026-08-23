@@ -36,6 +36,12 @@ product failure and will be adversarially tested.
   upstream code.
 - **The model never emits SQL.** It calls typed tool functions with typed args;
   the DB layer runs parametrized queries. SQL injection has no path.
+- **Grounding: the AI presents facts, it is never their source.** Every clinic
+  fact (service descriptions, durations, dentist titles/bios/skills,
+  availability) lives in the DB and reaches the model ONLY through tool results.
+  The model never answers clinic facts from its own training knowledge and never
+  browses the web. If a tool did not return it, the bot says it will check —
+  it does not guess. This is the primary anti-hallucination guarantee.
 
 ## 3. Runtime & stack
 
@@ -136,6 +142,11 @@ tree (`lib/booking` -> `src/server/domain/booking`, `lib/db` ->
 Existing: `professionals`, `services`, `professional_services`, `bookings`
 (with the `EXCLUDE USING gist` guard). Changes:
 
+- `services` gains `description TEXT` — the grounded, human explanation the bot
+  reads back (what the treatment is, roughly how long). Content, not logic.
+- `professionals` gains `title TEXT` (e.g. 'Junior Dentist'|'Senior Dentist')
+  and `bio TEXT` (years, specialties/skill set) — grounded content for the
+  "tell me about this dentist" answer.
 - `professionals` gains `calendar_provider TEXT` (e.g. 'google'|'outlook'|'zoho'|'noop')
   and `calendar_id TEXT` — which external calendar to write events to.
 - New `patients(id, name, email UNIQUE, created_at)`.
@@ -162,6 +173,12 @@ classify(msg: string, labels: string[]): Promise<string>  // structured, enum-on
 Message/tool/usage types are **neutral** (defined by us, not OpenAI). The OpenAI
 adapter translates to/from the wire format. `chat.ts` imports only neutral
 types, so a Bedrock adapter drops in behind the same interface.
+
+**DeepSeek + OpenAI free tier (concrete second provider).** DeepSeek speaks the
+OpenAI wire format, so the *same* OpenAI SDK works by swapping `baseURL` +
+`apiKey` + model. One `openai.ts` adapter, config-selected per env:
+`LLM_PROVIDER=openai|deepseek` -> factory returns the right client. This is why
+the neutral seam exists: proven by two real vendors, not a hypothetical Bedrock.
 
 ### 6.2 Layered guardrails (defense in depth)
 
@@ -272,31 +289,54 @@ model/errors:
   prints scope accuracy. Manual, costs money, used to demo real guardrail
   strength. CI stays green offline.
 
-## 12. Voice AI (future, seam only)
+## 12. Voice AI (future, seam only — PLACEHOLDER)
 
-No voice code now. `chat.ts` is transport-agnostic: a voice channel would
-transcribe speech -> call the same service -> speak the reply. Documented as a
-seam; the module split already supports it.
+Deferred. Text chat ships first. No voice code now; this is only a documented
+seam. Two independent edge adapters, neither touches the core:
+
+- **Speech-to-Text (voice IN):** transcribe audio -> feed text to the same
+  `chat()` service. This is the receptionist-on-the-phone story.
+- **Text-to-Speech (voice OUT):** synthesize `chat()`'s text reply to audio.
+  Cosmetic; lowest priority.
+
+`chat.ts` is already transport-agnostic (takes text, returns text), so both
+plug in at the edges with zero change to booking, guardrails, or the loop.
 
 ## 13. Build order (phased)
 
-1. **Drizzle swap** — `schema.ts`, `client.ts`, rewrite `queries.ts` behind the
-   existing `BookingRepository` port. Keep 22 tests green. Raw SQL constraint
-   untouched.
-2. **Booking core delta** — add `findAvailabilityForProfessional`; add tests.
-3. **Provider port + OpenAI adapter** — neutral types, factory.
+Priority: **get text chat talking first**, then harden. Drizzle is deferred —
+the DB layer already works and the tests run against an in-memory fake repo, so
+the swap can't break them and doesn't advance the conversation. It slots in
+before final polish.
+
+**Phase 1 — text chat (the graded core):**
+
+1. **Booking core delta** — add `listServices` + `findAvailabilityForProfessional`
+   (single-dentist slots); add tests. Pure, no API key.
+2. **Provider port + adapter** — neutral types, factory selecting
+   `openai | deepseek` by env (same SDK, `baseURL` swap).
+3. **Content columns + seed** — `services.description`, `professionals.title/bio`;
+   reseed to real names (John = junior; Oscar, Kate = senior).
 4. **Tools + dispatch (zod) + chat loop.**
 5. **Guardrails** — intent-gate, system prompt, output-validator, refusals.
 6. **Rate limit + tokens + thin controller** (`app/api/chat/route.ts`).
-7. **Auth (OTP)** — tables, otp/session/mailer, auth routes, appointments route.
-8. **Calendar** — types, registry, noop + stub adapters, booking side-effect,
-   `professionals.calendar_*` columns.
-9. **Golden set** — cases, mocked pipeline test, live eval script.
-10. **UI** — chat + login panel + appointments list.
-11. **README + end-to-end verification.**
+7. **Minimal chat UI** — talk to it end to end.
+
+**Phase 2 — harden + finish:**
+
+8. **Drizzle swap** — `schema.ts`, rewrite `queries.ts` behind the existing
+   `BookingRepository` port. Keep tests green. Raw SQL constraint untouched.
+9. **Auth (OTP)** — tables, otp/session/mailer, auth routes, appointments route.
+10. **Calendar** — types, registry, noop + stub adapters, booking side-effect,
+    `professionals.calendar_*` columns.
+11. **Golden set** — cases, mocked pipeline test, live eval script.
+12. **Login panel + appointments list UI.**
+13. **Voice seam** — documented placeholder only (see §12).
+14. **README + end-to-end verification.**
 
 ## 14. New dependencies
 
+- `openai` (SDK; drives both OpenAI and DeepSeek via `baseURL` swap)
 - `drizzle-orm`, `drizzle-kit` (dev)
 - `zod`
 - `jsonwebtoken` (or `jose`) for session cookie

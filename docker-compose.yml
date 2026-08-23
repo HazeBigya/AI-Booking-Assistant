@@ -5,32 +5,39 @@ services:
       POSTGRES_USER: clinic
       POSTGRES_PASSWORD: clinic
       POSTGRES_DB: clinic
-    # Auto-run schema + seed on FIRST boot (empty volume only).
-    # To re-seed after changing SQL: `docker compose down -v` then `up`.
     volumes:
-      - ./db/migrations:/docker-entrypoint-initdb.d:ro
       - pgdata:/var/lib/postgresql/data
-    # Healthcheck so the app can wait until Postgres actually accepts
-    # connections, not just until the container process has started.
+    # Healthcheck so dependents wait until Postgres actually accepts connections.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U clinic -d clinic"]
       interval: 5s
       timeout: 5s
       retries: 10
     ports:
-      # Exposed to the host so you can psql in for debugging. Not required
-      # by the app, which talks to `db:5432` over the internal network.
       - "5432:5432"
+
+  # One-shot: applies Drizzle migrations + seed, then exits. Replaces the old
+  # docker-entrypoint-initdb.d approach with tracked, incremental migrations.
+  migrate:
+    build:
+      context: .
+      target: migrator
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://clinic:clinic@db:5432/clinic
 
   app:
     build: .
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       # `db` is the compose service name = DNS hostname on the shared network.
       DATABASE_URL: postgres://clinic:clinic@db:5432/clinic
-      # Passed through from your shell / .env — never hard-coded.
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       HOSTNAME: "0.0.0.0"

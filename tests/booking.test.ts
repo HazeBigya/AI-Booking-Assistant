@@ -12,7 +12,12 @@ import {
   enumerateSlotStarts,
   addMinutes,
 } from "@server/domain/booking/rules";
-import { createBooking, findAvailability } from "@server/domain/booking/scheduler";
+import {
+  createBooking,
+  findAvailability,
+  findAvailabilityForProfessional,
+  listServices,
+} from "@server/domain/booking/scheduler";
 import {
   DoubleBookingError,
   type BookingRepository,
@@ -28,9 +33,6 @@ const MON = "2026-08-24"; // Monday, a working day
 const SUN = "2026-08-23"; // Sunday, closed
 const at = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00Z`);
 
-// ---------------------------------------------------------------------------
-// overlaps() — the interval primitive
-// ---------------------------------------------------------------------------
 describe("overlaps", () => {
   const iv = (s: string, e: string): Interval => ({ start: at(MON, s), end: at(MON, e) });
 
@@ -54,9 +56,6 @@ describe("overlaps", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// rules — clinic hours, working days, grid, capability
-// ---------------------------------------------------------------------------
 describe("rules", () => {
   it("junior can perform A and B but not C/D/E", () => {
     expect(canLevelPerform("junior", "A")).toBe(true);
@@ -98,9 +97,6 @@ describe("rules", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// computeAvailableSlots — the core algorithm
-// ---------------------------------------------------------------------------
 describe("computeAvailableSlots", () => {
   it("returns the full grid when there are no bookings", () => {
     const slots = computeAvailableSlots({
@@ -154,10 +150,7 @@ describe("computeAvailableSlots", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// scheduler — orchestration, tested with an in-memory fake repository.
-// This is also proof that the port abstraction works: no DB required.
-// ---------------------------------------------------------------------------
+// In-memory fake repo: proves the scheduler works against the port, no DB.
 class FakeRepo implements BookingRepository {
   private services: Service[];
   private capable: Map<number, Professional[]>; // serviceId -> pros
@@ -171,6 +164,9 @@ class FakeRepo implements BookingRepository {
     this.capable = capable;
   }
 
+  async listServices() {
+    return this.services;
+  }
   async getServiceByCode(code: string) {
     return this.services.find((s) => s.code === code) ?? null;
   }
@@ -257,8 +253,7 @@ describe("scheduler.createBooking", () => {
 describe("scheduler.findAvailability", () => {
   it("offers only qualified professionals and hides fully-booked ones", async () => {
     const repo = makeRepo();
-    // Fill the junior's whole day for service A by booking senior? No — book
-    // junior at every hour is heavy; instead check C offers senior only.
+    // Service C is senior-only, so only the senior should be offered.
     const avail = await findAvailability(repo, { serviceCode: "C", day: at(MON, "00:00") });
     expect("error" in avail).toBe(false);
     if (!("error" in avail)) {
@@ -274,7 +269,50 @@ describe("scheduler.findAvailability", () => {
   });
 });
 
-// Small sanity check on addMinutes used across the core.
+describe("scheduler.listServices", () => {
+  it("returns every service the repo knows", async () => {
+    const repo = makeRepo();
+    const services = await listServices(repo);
+    expect(services.map((s) => s.code).sort()).toEqual(["A", "C"]);
+  });
+});
+
+describe("scheduler.findAvailabilityForProfessional", () => {
+  it("returns that one professional's slots when qualified", async () => {
+    const repo = makeRepo();
+    const res = await findAvailabilityForProfessional(repo, {
+      serviceCode: "C",
+      professionalId: SENIOR.id,
+      day: at(MON, "00:00"),
+    });
+    expect("error" in res).toBe(false);
+    if (!("error" in res)) {
+      expect(res.professional.id).toBe(SENIOR.id);
+      expect(res.slots.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("errors when the professional cannot perform the service", async () => {
+    const repo = makeRepo();
+    const res = await findAvailabilityForProfessional(repo, {
+      serviceCode: "C", // senior-only
+      professionalId: JUNIOR.id,
+      day: at(MON, "00:00"),
+    });
+    expect(res).toMatchObject({ error: expect.any(String) });
+  });
+
+  it("errors for an unknown service", async () => {
+    const repo = makeRepo();
+    const res = await findAvailabilityForProfessional(repo, {
+      serviceCode: "Z",
+      professionalId: SENIOR.id,
+      day: at(MON, "00:00"),
+    });
+    expect(res).toMatchObject({ error: expect.any(String) });
+  });
+});
+
 describe("addMinutes", () => {
   it("adds minutes without mutating the input", () => {
     const start = at(MON, "09:00");
