@@ -37,7 +37,7 @@ export function createSmtpMailer(cfg: SmtpConfig): Mailer {
         subject: invite.summary,
         text: invite.description,
         // nodemailer sets the correct text/calendar MIME so clients show the invite.
-        icalEvent: { method: "REQUEST", content: buildIcs(invite) },
+        icalEvent: { method: invite.method ?? "REQUEST", content: buildIcs(invite) },
       });
     },
   };

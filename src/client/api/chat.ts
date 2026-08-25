@@ -15,3 +15,8 @@ export function sendChat(message: string) {
 export function getChatHistory() {
   return http.get<{ messages: ChatTurn[] }>("/api/chat/history");
 }
+
+// Start a fresh conversation (clears the chat-session cookie; keeps you logged in).
+export function resetChat() {
+  return http.post<{ ok: boolean }>("/api/chat/reset", {});
+}

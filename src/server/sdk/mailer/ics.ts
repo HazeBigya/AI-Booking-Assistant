@@ -3,13 +3,16 @@ import type { CalendarInvite } from "./types";
 // Builds an RFC 5545 iCalendar REQUEST for one appointment. Kept small and
 // hand-rolled (no dependency) — a single VEVENT is well within reach.
 export function buildIcs(invite: CalendarInvite): string {
+  const method = invite.method ?? "REQUEST";
+  const isCancel = method === "CANCEL";
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Bright Smile Clinic//Booking//EN",
-    "METHOD:REQUEST",
+    `METHOD:${method}`,
     "BEGIN:VEVENT",
     `UID:${invite.uid}`,
+    `SEQUENCE:${invite.sequence ?? 0}`,
     `DTSTAMP:${toIcsUtc(new Date())}`,
     `DTSTART:${toIcsFloating(invite.start)}`,
     `DTEND:${toIcsFloating(invite.end)}`,
@@ -20,7 +23,8 @@ export function buildIcs(invite: CalendarInvite): string {
       (a) => `ATTENDEE;CN=${escapeText(a.name)};RSVP=TRUE:mailto:${a.email}`,
     ),
     "LOCATION:Bright Smile Clinic",
-    "STATUS:CONFIRMED",
+    // CANCELLED tells the calendar to drop the event; CONFIRMED books it.
+    `STATUS:${isCancel ? "CANCELLED" : "CONFIRMED"}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];

@@ -4,6 +4,7 @@ import { db } from "../client";
 import { bookings, professionals, services } from "../schema";
 
 export interface PatientAppointment {
+  id: number;
   service: string;
   dentist: string;
   title: string;
@@ -15,6 +16,7 @@ export interface PatientAppointment {
 export async function getAppointmentsForPatient(email: string): Promise<PatientAppointment[]> {
   return db
     .select({
+      id: bookings.id,
       service: services.name,
       dentist: professionals.name,
       title: professionals.title,

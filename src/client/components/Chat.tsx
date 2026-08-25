@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getChatHistory, sendChat, type ChatTurn } from "@client/api/chat";
+import { getChatHistory, resetChat, sendChat, type ChatTurn } from "@client/api/chat";
 import { getSession, logout, type SessionUser } from "@client/api/auth";
 
 const GREETING: ChatTurn = {
@@ -43,6 +43,18 @@ export function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // Start a fresh conversation — clears server history and resets the view.
+  async function newConversation() {
+    try {
+      await resetChat();
+    } catch {
+      /* even if the call fails, reset the view so the user isn't stuck */
+    }
+    setMessages([GREETING]);
+    setInput("");
+    setError(null);
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || sending.current) return;
@@ -70,7 +82,10 @@ export function Chat() {
       <header className="flex items-center border-b bg-white px-4 py-3">
         <span className="flex-1" />
         <span className="font-semibold text-slate-800">🦷 Bright Smile Clinic</span>
-        <span className="flex flex-1 justify-end text-xs">
+        <span className="flex flex-1 items-center justify-end gap-3 text-xs">
+          <button className="text-blue-600" onClick={newConversation}>
+            New conversation
+          </button>
           {me && (
             <span className="flex items-center gap-2">
               <span className="text-slate-500">{me.name}</span>

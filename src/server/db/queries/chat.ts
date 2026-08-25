@@ -24,6 +24,12 @@ export async function getOrCreateChatSession(sessionId: string | undefined): Pro
   return created.id;
 }
 
+// Ties a chat session to a patient once they verify their email. Makes the
+// `patient_id` column meaningful (who owns this conversation) instead of NULL.
+export async function linkPatientToSession(sessionId: string, patientId: number): Promise<void> {
+  await db.update(chatSessions).set({ patientId }).where(eq(chatSessions.id, sessionId));
+}
+
 export async function saveChatMessage(
   sessionId: string,
   role: StoredMessage["role"],

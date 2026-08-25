@@ -12,4 +12,9 @@ describe("validateOutput", () => {
     expect(out).not.toContain("```");
     expect(out.toLowerCase()).toContain("dental");
   });
+
+  it("strips emojis and tidies the whitespace they leave", () => {
+    expect(validateOutput("Your appointment is booked! 😊")).toBe("Your appointment is booked!");
+    expect(validateOutput("Great 👍 — see you then")).toBe("Great — see you then");
+  });
 });

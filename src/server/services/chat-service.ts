@@ -3,7 +3,8 @@ import { runChat } from "@server/sdk/ai/chat";
 import { validateOutput } from "@server/sdk/ai/guardrails";
 import { SYSTEM_PROMPT } from "@server/sdk/ai/prompt";
 import type { ToolContext } from "@server/sdk/ai/tools";
-import { getRecentChatMessages, saveChatMessage } from "@server/db/queries/chat";
+import { getRecentChatMessages, linkPatientToSession, saveChatMessage } from "@server/db/queries/chat";
+import { findOrCreatePatient } from "@server/auth/patients";
 
 const CONTEXT_WINDOW = 15; // recent messages sent to the model
 
@@ -24,13 +25,18 @@ export async function handleChat(
   authedEmail?: string,
 ): Promise<ChatReply> {
   const authLine = authedEmail
-    ? `The patient is logged in as ${authedEmail}; booking and get_my_appointments use this identity.`
+    ? `The patient is ALREADY logged in and verified as ${authedEmail}. Treat them as ` +
+      `authenticated: book and show appointments DIRECTLY using this identity. Do NOT ask ` +
+      `for their email and do NOT run the login/OTP flow (request_login_code / ` +
+      `verify_login_code) again — they are already verified.`
     : `The patient is NOT logged in. To book or view appointments, verify their email first ` +
       `(collect email -> request_login_code -> ask for the code -> verify_login_code).`;
 
   const history = await getRecentChatMessages(sessionId, CONTEXT_WINDOW);
+  // Auth status is placed FIRST (primacy) and LAST (recency) so a weak model is
+  // far less likely to overlook that the patient is already logged in.
   const messages: ChatMessage[] = [
-    { role: "system", content: `${SYSTEM_PROMPT}\n\n${currentDateLine()}\n${authLine}` },
+    { role: "system", content: `${authLine}\n\n${SYSTEM_PROMPT}\n\n${currentDateLine()}\n${authLine}` },
     ...history,
     { role: "user", content: userMessage },
   ];
@@ -53,7 +59,17 @@ export async function handleChat(
   await saveChatMessage(sessionId, "user", userMessage);
   await saveChatMessage(sessionId, "assistant", reply, totalTokens);
 
-  return { reply, totalTokens, authenticateAs: ctx.authenticatedAs };
+  // If they verified their email this turn, tie this conversation to that
+  // patient. Name is unknown at verify time; use the email local part as a
+  // placeholder (a real name is captured at booking). find-or-create is safe
+  // whether or not the patient already exists.
+  const authenticateAs = ctx.authenticatedAs;
+  if (authenticateAs) {
+    const patient = await findOrCreatePatient(authenticateAs, authenticateAs.split("@")[0]);
+    await linkPatientToSession(sessionId, patient.id);
+  }
+
+  return { reply, totalTokens, authenticateAs };
 }
 
 // Clinic time is UTC by our simplification, so read the date in UTC.

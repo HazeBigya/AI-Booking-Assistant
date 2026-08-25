@@ -51,14 +51,19 @@ Tracks what's done and what remains. Deadline: Sept 4.
       on `request_login_code`/`verify_login_code` (brute-force + spam protection)
 - [x] **One-command setup** — `npm run setup` (wipe + boot + migrate + seed);
       `docker compose up` runs the full app + auto migrate/seed for the interviewer
-- [ ] **Price snapshot** — write `bookings.price` at booking time (currently null);
-      then tighten `patient_id`/`price` to NOT NULL via a migration
+- [x] **Price + patient snapshot** — `bookings.price` (per-dentist override/base)
+      and `bookings.patient_id` are now written at booking time, resolved from
+      authoritative tables in the persistence layer. (NOT NULL tightening: parked.)
+- [x] **Past-time guard** — deterministic: `check_availability` filters past
+      slots, `create_booking` rejects a past start; regression-locked by tests.
+- [x] **Session ↔ patient link** — `chat_sessions.patient_id` set on email verify.
 
 ### Quality pass
-- [ ] Consistency/SoC/dead-code sweep across all files (read like one author)
-- [ ] Remove or wire the unused intent-gate + any leftover exports
-- [ ] **README** — accurate setup, architecture, design decisions, security notes,
-      documented simplifications (must match what's actually built)
+- [x] Remove the unused intent-gate (`isInScope`, `INTENT_LABELS`, `REFUSAL_MESSAGE`);
+      `classify` kept as a tested provider-seam capability, off the hot path
+- [x] **README** — rewritten to match what's actually built (auth, persistence,
+      invites, fallback chain, past-time guard, 49 tests)
+- [ ] Optional: consistency/SoC final read-through
 
 ### UI bettering
 - [ ] Polish chat UX — message spacing, timestamps, loading/typing states,
@@ -71,9 +76,10 @@ Tracks what's done and what remains. Deadline: Sept 4.
 
 ### Testing + optimization (last)
 - [x] Tests for recent logic: `.ics` builder, fallback chain, rate limiter,
-      output validator (43 tests total). `npm run setup` runs the suite at the end.
-- [ ] Still to broaden: tool dispatch (zod paths, mocked deps), auth/OTP logic,
-      a golden-set eval (mocked provider, CI-safe)
+      output validator, **tool-dispatch guards** (auth-gate, past-time, IDOR,
+      bad input) — **49 tests total**. `npm run setup` runs the suite at the end.
+- [ ] Still to broaden (post-MVP): auth/OTP unit tests, a golden-set eval
+      (mocked provider, CI-safe)
 - [ ] Optimization: token budget cap per session, prompt trimming, query/index
       review, streaming responses, caching where it helps
 

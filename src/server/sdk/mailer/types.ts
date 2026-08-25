@@ -9,6 +9,10 @@ export interface CalendarInvite {
   end: Date;
   organizer: { name: string; email: string };
   attendees: { name: string; email: string }[]; // patient + dentist
+  // REQUEST (new/updated) or CANCEL (retract). Clients match on UID, so a CANCEL
+  // with the original UID + a higher sequence removes the event from calendars.
+  method?: "REQUEST" | "CANCEL";
+  sequence?: number;
 }
 
 export interface Mailer {
