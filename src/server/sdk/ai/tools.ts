@@ -6,18 +6,23 @@ import { getAppointmentsForPatient } from "@server/db/queries/appointments";
 import { cancelBookingForPatient } from "@server/db/queries/bookings";
 import { pgBookingRepository } from "@server/db/queries";
 import { createBooking, findAvailabilityForProfessional } from "@server/domain/booking/scheduler";
+import { CLINIC } from "@server/domain/booking/rules";
+import {
+  formatZonedDate,
+  formatZonedTime,
+  sameZonedDay,
+  zonedTimeToUtc,
+} from "@server/domain/booking/timezone";
 import { createOtp, verifyOtp } from "@server/auth/otp";
 import { findOrCreatePatient } from "@server/auth/patients";
 import { getMailer } from "@server/sdk/mailer";
 import { rateLimit } from "@server/shared/rate-limit";
 
-// OTP abuse limits (per email, 10-min window): cap code requests (inbox spam)
-// and verify attempts (brute-forcing the 6-digit code).
 const OTP_WINDOW_MS = 10 * 60_000;
 const OTP_REQUEST_MAX = 3;
 const OTP_VERIFY_MAX = 5;
 
-// What the model sees. Descriptions guide it; the JSON Schema constrains args.
+// Descriptions guide the model; the JSON Schema constrains the arguments.
 export const toolDefs: ToolDef[] = [
   {
     name: "list_services",
@@ -38,7 +43,14 @@ export const toolDefs: ToolDef[] = [
     name: "check_availability",
     description:
       "Get one dentist's open appointment slots for a service on a given day. Pass the service " +
-      "and dentist by NAME exactly as the patient said them.",
+      "and dentist by NAME exactly as the patient said them. When asked about a SPECIFIC " +
+      "dentist you MUST call this for THAT dentist; the result echoes which professional it " +
+      "is for, so check that it matches who was asked about. Never say a dentist is " +
+      "unavailable unless this returned an empty 'slots' list — if it returns slots, that " +
+      "dentist IS available, so never substitute another. Slots are already filtered for you: " +
+      "times that have passed, and times the logged-in patient is busy, are removed. If " +
+      "'slots' is empty, 'note' explains why (closed that day / too late in the day for an " +
+      "appointment that long / fully booked) — relay that reason.",
     parameters: {
       type: "object",
       properties: {
@@ -77,17 +89,26 @@ export const toolDefs: ToolDef[] = [
   {
     name: "get_my_appointments",
     description:
-      "List ALL of the logged-in patient's own appointments — past and upcoming — with dentist. " +
-      "No arguments; identity comes from the verified session. Requires the patient to be logged in.",
+      "List ALL of the logged-in patient's own appointments — past and upcoming — each with " +
+      "the dentist and ready clinic-local date/time labels. No arguments; identity comes from " +
+      "the verified session. Requires the patient to be logged in. Never claim you cannot see " +
+      "past appointments: this returns them. You may group them into Upcoming and Past, but " +
+      "show every one it returns.",
     parameters: { type: "object", properties: {}, required: [] },
   },
   {
     name: "create_booking",
     description:
       "Book an appointment for the logged-in patient. Requires the patient to be verified " +
-      "(via request_login_code + verify_login_code) first; the email comes from the session. " +
-      "Pass the service and dentist by NAME exactly as the patient asked — the backend resolves " +
-      "them and will reject an unknown name, so never guess or substitute a different dentist.",
+      "(via request_login_code + verify_login_code) first; the email comes from the session, so " +
+      "you supply only their name. Pass the service and dentist by NAME exactly as the patient " +
+      "asked — never ids or codes. The backend resolves the names and rejects an unknown one, " +
+      "so never guess and never substitute a different dentist. Do NOT judge time conflicts " +
+      "yourself: appointments are end-exclusive (9-10 and 10-11 do NOT clash) and this tool " +
+      "rejects genuine clashes — call it and report what it returns rather than refusing on " +
+      "your own arithmetic. On success the result carries 'confirmed' with the details to read " +
+      "back; on failure 'confirmed' is null and you must tell the patient plainly that it did " +
+      "NOT go through, with the reason given.",
     parameters: {
       type: "object",
       properties: {
@@ -102,9 +123,11 @@ export const toolDefs: ToolDef[] = [
   {
     name: "cancel_booking",
     description:
-      "Cancel one of the logged-in patient's own appointments by its id (the 'id' " +
-      "field from get_my_appointments). Requires the patient to be logged in; a " +
-      "patient can only cancel their own appointment.",
+      "Cancel one of the logged-in patient's own appointments by its id (the 'id' field from " +
+      "get_my_appointments). Call get_my_appointments first to find the id, and confirm with " +
+      "the patient which appointment they mean before cancelling. Never show the id to the " +
+      "patient. Requires the patient to be logged in; a patient can only cancel their own " +
+      "appointment.",
     parameters: {
       type: "object",
       properties: {
@@ -134,17 +157,27 @@ const schemas = {
   cancel_booking: z.object({ bookingId: z.number().int() }),
 };
 
-// Server-managed context, never from the model:
-//   authedEmail     - the verified patient this request (incoming session, or set
-//                     by verify_login_code mid-conversation). Gates booking + lookup.
-//   authenticatedAs - set by verify_login_code on success; signals the route to
-//                     persist the session cookie.
+// Server-managed, never from the model. bookingConfirmed/bookingCancelled record
+// what actually happened this turn; the chat loop checks the reply against them.
+// patientTimeZone is display only and never affects which slots exist.
 export interface ToolContext {
   authedEmail?: string;
   authenticatedAs?: string;
+  bookingConfirmed?: boolean;
+  bookingCancelled?: boolean;
+  patientTimeZone?: string;
 }
 
-// Runs one tool call and returns a JSON string to feed back to the model.
+// Undefined keys are dropped by JSON.stringify, so a patient in the clinic's own
+// zone sees no extra field.
+function timeLabels(at: Date, ctx: ToolContext) {
+  const elsewhere = ctx.patientTimeZone && ctx.patientTimeZone !== CLINIC.timeZone;
+  return {
+    time: formatZonedTime(at, CLINIC.timeZone),
+    yourLocalTime: elsewhere ? formatZonedTime(at, ctx.patientTimeZone!) : undefined,
+  };
+}
+
 // Never throws on bad input — returns an { error } payload the model can read.
 export async function runTool(
   name: string,
@@ -169,39 +202,50 @@ export async function runTool(
     case "check_availability": {
       const parsed = schemas.check_availability.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
-      const day = new Date(parsed.data.day);
-      if (Number.isNaN(day.getTime())) return errorResult(`Invalid day "${parsed.data.day}".`);
+      const day = parseClinicDay(parsed.data.day);
+      if (!day) return errorResult(`Invalid day "${parsed.data.day}" — expected YYYY-MM-DD.`);
       const svc = await resolveService(parsed.data.serviceName);
       if ("error" in svc) return errorResult(svc.error);
       const den = await resolveDentist(svc.service.code, svc.service.name, parsed.data.dentistName);
       if ("error" in den) return errorResult(den.error);
+      const now = new Date();
       const result = await findAvailabilityForProfessional(pgBookingRepository, {
         serviceCode: svc.service.code,
         professionalId: den.dentist.professionalId,
         day,
         patientEmail: ctx.authedEmail, // exclude the logged-in patient's own conflicts
+        now,
       });
-      // Never offer slots in the past. "now" is a temporal/IO concern, applied at
-      // this boundary so the pure scheduler stays deterministic and testable.
-      if ("slots" in result) {
-        const now = Date.now();
-        result.slots = result.slots.filter((s) => s.getTime() > now);
-        // Include the patient's OWN appointments that day so the model can tell
-        // "you're already booked then" apart from "the dentist is booked". A slot
-        // hidden here may be the patient's conflict, not the dentist's.
-        if (ctx.authedEmail) {
-          const yourExistingAppointments = (await getAppointmentsForPatient(ctx.authedEmail))
-            .filter((a) => sameUtcDay(a.start, day))
-            .map((a) => ({ service: a.service, dentist: a.dentist, start: a.start, end: a.end }));
-          return JSON.stringify({ ...result, yourExistingAppointments });
+      if ("error" in result) return JSON.stringify(result);
+
+      const payload: Record<string, unknown> = {
+        ...result,
+        day: clinicDayLabel(day),
+        clinicTimeZone: CLINIC.timeZone,
+        currentClinicTime: formatZonedTime(now, CLINIC.timeZone),
+        slots: result.slots.map((s) => ({ start: s.toISOString(), ...timeLabels(s, ctx) })),
+      };
+
+      // Lets the model tell "you're already booked" from "the dentist is booked".
+      if (ctx.authedEmail) {
+        const yours = (await getAppointmentsForPatient(ctx.authedEmail))
+          .filter((a) => sameZonedDay(a.start, day, CLINIC.timeZone))
+          .map((a) => describeAppointment(a, ctx));
+        if (yours.length > 0) {
+          payload.yourExistingAppointments = yours;
+          payload.yourExistingAppointmentsNote =
+            "These are the PATIENT's own appointments that day, and the times they cover " +
+            "were removed from 'slots'. If the patient asks for one of those times, the " +
+            "clash is THEIRS, not the dentist's: say \"you already have a <service> with " +
+            "<dentist> at <time>\" — never say the dentist is unavailable. Only call the " +
+            "dentist booked when a missing time does not overlap any appointment listed here.";
         }
       }
-      return JSON.stringify(result);
+      return JSON.stringify(payload);
     }
 
     case "request_login_code": {
-      // Deterministic: if already logged in, don't re-verify — the model tends to
-      // ask for email anyway, so the tool itself redirects it. No email is sent.
+      // The model asks for an email even when logged in, so the tool redirects it.
       if (ctx.authedEmail) {
         return JSON.stringify({
           ok: true,
@@ -240,7 +284,6 @@ export async function runTool(
       if (!rateLimit(`otp-verify:${parsed.data.email}`, { max: OTP_VERIFY_MAX, windowMs: OTP_WINDOW_MS }).allowed) {
         return JSON.stringify({ ok: false, message: "Too many attempts. Please request a new code and wait a few minutes." });
       }
-      // Deterministic check — the model only relays the code; it never decides.
       if (!(await verifyOtp(parsed.data.email, parsed.data.code))) {
         return JSON.stringify({ ok: false, message: "That code is invalid or expired." });
       }
@@ -255,12 +298,12 @@ export async function runTool(
       if (!ctx.authedEmail) {
         return errorResult("The patient must be logged in to view their appointments.");
       }
-      return JSON.stringify(await getAppointmentsForPatient(ctx.authedEmail));
+      const appointments = await getAppointmentsForPatient(ctx.authedEmail);
+      return JSON.stringify(appointments.map((a) => describeAppointment(a, ctx)));
     }
 
     case "create_booking": {
-      // Gated: must be verified. Email comes from the session, so a patient can
-      // only ever book under their own verified (deliverable) address.
+      // Email comes from the session: a patient can only book under their own address.
       if (!ctx.authedEmail) {
         return errorResult("The patient must verify their email (request + verify a code) before booking.");
       }
@@ -268,13 +311,16 @@ export async function runTool(
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
       const start = new Date(parsed.data.start);
       if (Number.isNaN(start.getTime())) return errorResult(`Invalid start "${parsed.data.start}".`);
-      // Deterministic guard: never book a time in the past, whatever the model asks.
-      if (start.getTime() <= Date.now()) {
-        return errorResult(`Cannot book ${parsed.data.start} — that time is in the past.`);
+      const now = new Date();
+      if (start.getTime() <= now.getTime()) {
+        return errorResult(
+          `Cannot book ${formatZonedTime(start, CLINIC.timeZone)} on ` +
+            `${formatZonedDate(start, CLINIC.timeZone)} — that time has already passed. ` +
+            `It is now ${formatZonedTime(now, CLINIC.timeZone)}.`,
+        );
       }
-      // Resolve the service and dentist from their NAMES in code — the model is
-      // unreliable at tracking numeric ids/codes, so it never handles them. An
-      // unknown name is rejected (never silently substituted).
+      // Resolved from NAMES in code — the model is unreliable with numeric ids.
+      // An unknown name is rejected, never silently substituted.
       const svc = await resolveService(parsed.data.serviceName);
       if ("error" in svc) return errorResult(svc.error);
       const den = await resolveDentist(svc.service.code, svc.service.name, parsed.data.dentistName);
@@ -285,11 +331,12 @@ export async function runTool(
         start,
         patientName: parsed.data.patientName,
         patientEmail: ctx.authedEmail,
+        now,
       });
 
-      // Fire-and-forget calendar invite after a successful booking — never lets
-      // an email failure undo a committed booking.
+      // Fire-and-forget: an email failure must not undo a committed booking.
       if (result.ok) {
+        ctx.bookingConfirmed = true;
         try {
           const dentist = await getProfessionalContact(result.professional.id);
           await getMailer().sendInvite({
@@ -310,8 +357,28 @@ export async function runTool(
         } catch (err) {
           console.error("sendInvite failed:", err);
         }
+        return JSON.stringify({
+          ...result,
+          confirmed: {
+            service: result.service.name,
+            dentist: result.professional.name,
+            date: formatZonedDate(result.booking.start, CLINIC.timeZone),
+            time: clinicRange(result.booking.start, result.booking.end, CLINIC.timeZone),
+            yourLocalTime:
+              ctx.patientTimeZone && ctx.patientTimeZone !== CLINIC.timeZone
+                ? clinicRange(result.booking.start, result.booking.end, ctx.patientTimeZone)
+                : undefined,
+          },
+        });
       }
-      return JSON.stringify(result);
+      return JSON.stringify({
+        ...result,
+        confirmed: null,
+        instruction:
+          "This booking was NOT made. Tell the patient plainly that it did not go " +
+          "through, give the reason above, and offer an alternative. Never say it " +
+          "is confirmed.",
+      });
     }
 
     case "cancel_booking": {
@@ -320,13 +387,12 @@ export async function runTool(
       }
       const parsed = schemas.cancel_booking.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
-      // Ownership is enforced in SQL (WHERE id + patient_email + status='booked'):
-      // a patient can only cancel their own still-booked appointment.
+      // Ownership enforced in the WHERE clause — no IDOR, no double-cancel.
       const cancelled = await cancelBookingForPatient(parsed.data.bookingId, ctx.authedEmail);
       if (!cancelled) {
         return errorResult("No matching upcoming appointment found under your account to cancel.");
       }
-      // Fire-and-forget CANCEL invite so both calendars drop the event.
+      ctx.bookingCancelled = true;
       try {
         const dentist = await getProfessionalContact(cancelled.professionalId);
         await getMailer().sendInvite({
@@ -357,8 +423,7 @@ export async function runTool(
   }
 }
 
-// Resolve a service by name; returns the matched service or an error message.
-// Names (not codes) are what the patient says and the model reliably echoes.
+// Names, not codes: what the patient says and the model reliably echoes.
 async function resolveService(
   serviceName: string,
 ): Promise<{ service: { code: string; name: string } } | { error: string }> {
@@ -370,8 +435,7 @@ async function resolveService(
   return { service };
 }
 
-// Resolve a dentist by name WITHIN a service's provider list. Rejects an unknown
-// name (listing valid dentists) instead of silently substituting another dentist.
+// Rejects an unknown name instead of substituting a different dentist.
 async function resolveDentist(
   serviceCode: string,
   serviceName: string,
@@ -386,17 +450,44 @@ async function resolveDentist(
   return { dentist };
 }
 
-// Same calendar day in UTC (clinic time is UTC by our simplification).
-function sameUtcDay(a: Date, b: Date): boolean {
-  return (
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate()
+// Anchored at noon so a DST shift near midnight cannot land on the adjacent day.
+function parseClinicDay(day: string): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(day.trim());
+  if (!match) return undefined;
+  const anchor = zonedTimeToUtc(
+    { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]), hour: 12 },
+    CLINIC.timeZone,
   );
+  return Number.isNaN(anchor.getTime()) ? undefined : anchor;
 }
 
-// Case-insensitive name match: exact first, then a unique substring match.
-// Returns undefined if nothing matches or a substring match is ambiguous —
+function clinicDayLabel(day: Date): string {
+  return formatZonedDate(day, CLINIC.timeZone);
+}
+
+function describeAppointment(
+  a: { id: number; service: string; dentist: string; title: string; start: Date; end: Date },
+  ctx: ToolContext,
+) {
+  const elsewhere = ctx.patientTimeZone && ctx.patientTimeZone !== CLINIC.timeZone;
+  return {
+    id: a.id,
+    service: a.service,
+    dentist: a.dentist,
+    title: a.title,
+    date: formatZonedDate(a.start, CLINIC.timeZone),
+    time: clinicRange(a.start, a.end, CLINIC.timeZone),
+    yourLocalTime: elsewhere ? clinicRange(a.start, a.end, ctx.patientTimeZone!) : undefined,
+    start: a.start.toISOString(),
+    end: a.end.toISOString(),
+  };
+}
+
+function clinicRange(start: Date, end: Date, timeZone: string): string {
+  return `${formatZonedTime(start, timeZone)} – ${formatZonedTime(end, timeZone)}`;
+}
+
+// Exact match first, then a unique substring. Ambiguous -> undefined, so
 // callers reject rather than guess.
 function matchByName<T>(items: T[], query: string, nameOf: (item: T) => string): T | undefined {
   const q = query.trim().toLowerCase();

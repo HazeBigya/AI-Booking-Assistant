@@ -1,4 +1,4 @@
-import { enumerateSlotStarts, addMinutes } from "./rules";
+import { enumerateSlotStarts, addMinutes, CLINIC } from "./rules";
 
 export interface Interval {
   start: Date;
@@ -16,10 +16,21 @@ export function computeAvailableSlots(params: {
   day: Date;
   durationMin: number;
   existingBookings: Interval[];
+  // Injected, not read, to keep this pure. Drops slots that already started:
+  // at 1:03 PM the clinic can still offer 1:30 PM, not 9:00 AM.
+  now?: Date;
+  timeZone?: string;
 }): Date[] {
-  const { day, durationMin, existingBookings } = params;
+  const {
+    day,
+    durationMin,
+    existingBookings,
+    now,
+    timeZone = CLINIC.timeZone,
+  } = params;
 
-  return enumerateSlotStarts(day, durationMin).filter((start) => {
+  return enumerateSlotStarts(day, durationMin, timeZone).filter((start) => {
+    if (now && start.getTime() <= now.getTime()) return false;
     const candidate: Interval = { start, end: addMinutes(start, durationMin) };
     return !existingBookings.some((booking) => overlaps(candidate, booking));
   });

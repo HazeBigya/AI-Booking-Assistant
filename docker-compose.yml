@@ -38,15 +38,24 @@ services:
     environment:
       # `db` is the compose service name = DNS hostname on the shared network.
       DATABASE_URL: postgres://clinic:clinic@db:5432/clinic
-      LLM_PROVIDERS: ${LLM_PROVIDERS:-openai}
+      # Which provider(s) to use, in priority order. Must default to EMPTY — a
+      # non-empty default here would silently override what .env says.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      LLM_PROVIDERS: ${LLM_PROVIDERS:-} # backwards-compatible alias
+      CUSTOM_BASE_URL: ${CUSTOM_BASE_URL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-deepseek/deepseek-chat-v3.1:free}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      CUSTOM_API_KEY: ${CUSTOM_API_KEY:-}
+      CUSTOM_MODEL: ${CUSTOM_MODEL:-}
+      CLINIC_TIMEZONE: ${CLINIC_TIMEZONE:-UTC}
       AUTH_SECRET: ${AUTH_SECRET:-dev-only-insecure-secret-change-me}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

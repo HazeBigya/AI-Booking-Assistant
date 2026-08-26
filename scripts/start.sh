@@ -48,6 +48,18 @@ if ! docker info >/dev/null 2>&1; then
   fi
 fi
 
+# 3b. The clinic's time zone. Containers always run on UTC, so unless .env says
+#     otherwise, hand the app THIS Mac's zone — right for a single-location
+#     clinic, and it means nobody has to configure anything to get started.
+if ! grep -qE '^[[:space:]]*CLINIC_TIMEZONE=[^[:space:]]' .env; then
+  host_tz="$(readlink /etc/localtime | sed 's|.*/zoneinfo/||')"
+  if [ -n "$host_tz" ]; then
+    export CLINIC_TIMEZONE="$host_tz" # shell env wins over .env in compose
+    echo "→ Clinic time zone not set; using this computer's: $host_tz"
+    echo "  (set CLINIC_TIMEZONE in .env if the clinic is somewhere else)"
+  fi
+fi
+
 echo "✓ Docker is ready. Building and starting everything..."
 echo "  (first run downloads images + builds — this can take a few minutes)"
 echo

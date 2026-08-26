@@ -2,10 +2,8 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
-// Lazily create one shared Pool + Drizzle instance on first use. Doing this
-// lazily (instead of at import time) keeps the module side-effect-free, so
-// `next build` can load route files to collect page data without a live
-// DATABASE_URL — the connection is only needed when a query actually runs.
+// Lazy, so the module stays side-effect-free and `next build` can load route
+// files to collect page data without a live DATABASE_URL.
 let poolInstance: Pool | undefined;
 let dbInstance: NodePgDatabase<typeof schema> | undefined;
 
@@ -21,8 +19,6 @@ function init(): NodePgDatabase<typeof schema> {
   return dbInstance;
 }
 
-// Proxies forward every access to the real instance, initializing on first
-// touch. Callers keep using `db` / `pool` exactly as before.
 export const db = new Proxy({} as NodePgDatabase<typeof schema>, {
   get(_target, prop) {
     return Reflect.get(init() as object, prop);

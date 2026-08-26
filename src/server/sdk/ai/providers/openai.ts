@@ -18,8 +18,7 @@ export interface OpenAIAdapterConfig {
   model: string;
 }
 
-// DeepSeek speaks the OpenAI wire format, so the same client serves both —
-// only baseURL + apiKey + model differ.
+// Every OpenAI-wire vendor shares this client; only baseURL/apiKey/model differ.
 export function createOpenAIProvider(cfg: OpenAIAdapterConfig): LLMProvider {
   const client = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL });
 
@@ -60,8 +59,7 @@ export function createOpenAIProvider(cfg: OpenAIAdapterConfig): LLMProvider {
         ],
       });
       const raw = (res.choices[0].message.content ?? "").toLowerCase();
-      // Substring match (model may add punctuation/words). No clear match -> the
-      // FIRST label: the caller orders its safe default first (gate = fail-open).
+      // No clear match -> the FIRST label, which callers order as their safe default.
       return labels.find((l) => raw.includes(l.toLowerCase())) ?? labels[0];
     },
   };

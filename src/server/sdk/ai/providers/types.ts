@@ -1,6 +1,5 @@
-// Vendor-neutral LLM types. Nothing here references OpenAI/DeepSeek — the
-// adapter translates to/from a vendor wire format. The chat loop imports only
-// these, so a new provider (Bedrock, etc.) drops in behind LLMProvider.
+// Vendor-neutral. The chat loop imports only these, so a new provider drops
+// in behind LLMProvider.
 
 export type Role = "system" | "user" | "assistant" | "tool";
 

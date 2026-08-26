@@ -5,10 +5,21 @@ export interface ChatTurn {
   content: string;
 }
 
-// Send one message; the server holds the conversation (keyed by the chat-session
-// cookie) and returns the assistant's reply.
+// The server holds the conversation, keyed by the chat-session cookie. The
+// browser's zone rides along so times can be shown on the patient's own clock.
 export function sendChat(message: string) {
-  return http.post<{ reply: string; totalTokens: number }>("/api/chat", { message });
+  return http.post<{ reply: string; totalTokens: number }>("/api/chat", {
+    message,
+    timeZone: browserTimeZone(),
+  });
+}
+
+function browserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // Load the persisted conversation for this browser's chat session (survives refresh).

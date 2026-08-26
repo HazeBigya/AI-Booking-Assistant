@@ -9,8 +9,6 @@ export interface StoredMessage {
   content: string;
 }
 
-// Returns an existing session id (if the cookie's session still exists) or
-// creates a fresh one. The returned id is what the route stores in the cookie.
 export async function getOrCreateChatSession(sessionId: string | undefined): Promise<string> {
   if (sessionId) {
     const rows = await db
@@ -24,8 +22,7 @@ export async function getOrCreateChatSession(sessionId: string | undefined): Pro
   return created.id;
 }
 
-// Ties a chat session to a patient once they verify their email. Makes the
-// `patient_id` column meaningful (who owns this conversation) instead of NULL.
+// Makes patient_id meaningful — who owns this conversation — instead of NULL.
 export async function linkPatientToSession(sessionId: string, patientId: number): Promise<void> {
   await db.update(chatSessions).set({ patientId }).where(eq(chatSessions.id, sessionId));
 }
@@ -39,8 +36,6 @@ export async function saveChatMessage(
   await db.insert(chatMessages).values({ sessionId, role, content, tokens: tokens ?? null });
 }
 
-// Last `limit` messages, chronological. Used both to load the UI on refresh and
-// to give the model recent context.
 export async function getRecentChatMessages(
   sessionId: string,
   limit = 15,
@@ -54,7 +49,6 @@ export async function getRecentChatMessages(
   return rows.reverse().map((r) => ({ role: r.role as StoredMessage["role"], content: r.content }));
 }
 
-// All messages for a session, chronological — for loading the chat on page load.
 export async function getChatHistory(sessionId: string): Promise<StoredMessage[]> {
   const rows = await db
     .select({ role: chatMessages.role, content: chatMessages.content })

@@ -6,9 +6,8 @@ export interface GeminiAdapterConfig {
   model: string;
 }
 
-// Native @google/genai adapter behind the same LLMProvider interface. A third
-// SDK shape (alongside OpenAI-wire and Bedrock Converse) — proof the seam
-// abstracts genuinely different vendors, not just OpenAI clones.
+// A third SDK shape alongside OpenAI-wire and Bedrock Converse — proof the
+// seam abstracts genuinely different vendors.
 export function createGeminiProvider(cfg: GeminiAdapterConfig): LLMProvider {
   const ai = new GoogleGenAI({ apiKey: cfg.apiKey });
 
@@ -72,8 +71,7 @@ function toGemini(messages: ChatMessage[]): { systemInstruction: string; content
       }
       contents.push({ role: "model", parts });
     } else if (m.role === "tool") {
-      // Gemini expects tool results as a functionResponse part in a user turn,
-      // matched by the tool's name.
+      // Gemini expects tool results as a functionResponse part in a user turn.
       contents.push({
         role: "user",
         parts: [{ functionResponse: { name: m.name ?? "", response: safeObject(m.content) } }],
@@ -86,7 +84,6 @@ function toGemini(messages: ChatMessage[]): { systemInstruction: string; content
 }
 
 function toGeminiTool(t: ToolDef) {
-  // parametersJsonSchema takes our raw JSON Schema directly (no Schema conversion).
   return { name: t.name, description: t.description, parametersJsonSchema: t.parameters };
 }
 

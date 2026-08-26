@@ -32,6 +32,7 @@ export async function chatController(input: {
       sessionId,
       message,
       input.authedEmail,
+      parseTimeZone(input.payload),
     );
     return { status: 200, body: { reply, totalTokens }, authenticateAs, chatSessionId: sessionId };
   } catch (err) {
@@ -45,4 +46,17 @@ function parseMessage(payload: unknown): string | null {
   const { message } = payload as { message?: unknown };
   if (typeof message !== "string" || message.trim() === "") return null;
   return message;
+}
+
+// Client input: validated against the platform's tz database before use.
+export function parseTimeZone(payload: unknown): string | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const { timeZone } = payload as { timeZone?: unknown };
+  if (typeof timeZone !== "string" || timeZone.trim() === "") return undefined;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return undefined; // unknown zone — ignore rather than fail the turn
+  }
 }

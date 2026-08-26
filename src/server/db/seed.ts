@@ -2,8 +2,7 @@ import "dotenv/config";
 import { db, pool } from "./client";
 import { professionals, professionalServices, services } from "./schema";
 
-// Idempotent: skips if professionals already exist. `docker compose down -v`
-// (or truncate) to reseed from scratch.
+// Idempotent: skips if professionals already exist. `docker compose down -v` to reseed.
 async function seed() {
   const existing = await db.select({ id: professionals.id }).from(professionals).limit(1);
   if (existing.length > 0) {
@@ -94,16 +93,13 @@ async function seed() {
     note: string;
     priceOverride?: number;
   }[] = [
-    // John (junior): A, B only.
     { pro: "John", code: "A", proficiency: 3, note: "Comfortable with routine checkups." },
     { pro: "John", code: "B", proficiency: 3, note: "Performs standard whitening treatments." },
-    // Oscar (senior): all; strongest at restorative work.
     { pro: "Oscar", code: "A", proficiency: 4, note: "Thorough general exams." },
     { pro: "Oscar", code: "B", proficiency: 4, note: "Experienced with whitening." },
     { pro: "Oscar", code: "C", proficiency: 5, note: "Highly experienced with fillings." },
     { pro: "Oscar", code: "D", proficiency: 5, note: "Root canal specialist." },
     { pro: "Oscar", code: "E", proficiency: 5, note: "Leads complex full-mouth restorations." },
-    // Kate (senior): all; cosmetic/whitening specialist, premium whitening price.
     { pro: "Kate", code: "A", proficiency: 4, note: "Thorough general exams." },
     {
       pro: "Kate",

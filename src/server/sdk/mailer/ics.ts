@@ -1,7 +1,6 @@
 import type { CalendarInvite } from "./types";
 
-// Builds an RFC 5545 iCalendar REQUEST for one appointment. Kept small and
-// hand-rolled (no dependency) — a single VEVENT is well within reach.
+// RFC 5545 iCalendar for one appointment. Hand-rolled — a single VEVENT.
 export function buildIcs(invite: CalendarInvite): string {
   const method = invite.method ?? "REQUEST";
   const isCancel = method === "CANCEL";
@@ -23,7 +22,6 @@ export function buildIcs(invite: CalendarInvite): string {
       (a) => `ATTENDEE;CN=${escapeText(a.name)};RSVP=TRUE:mailto:${a.email}`,
     ),
     "LOCATION:Bright Smile Clinic",
-    // CANCELLED tells the calendar to drop the event; CONFIRMED books it.
     `STATUS:${isCancel ? "CANCELLED" : "CONFIRMED"}`,
     "END:VEVENT",
     "END:VCALENDAR",
@@ -31,15 +29,12 @@ export function buildIcs(invite: CalendarInvite): string {
   return lines.join("\r\n");
 }
 
-// iCalendar UTC timestamp: YYYYMMDDTHHMMSSZ (for DTSTAMP).
 function toIcsUtc(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-// Floating (no Z) wall-clock: YYYYMMDDTHHMMSS. We store times as UTC-treated-as-
-// clinic-local, so emitting them floating makes "9:00" show as 9:00 in any
-// viewer's calendar. A real multi-timezone deploy would anchor to the clinic's
-// IANA zone with a VTIMEZONE + TZID instead.
+// Floating (no Z) wall-clock, so "9:00" shows as 9:00 in any viewer's calendar.
+// A multi-timezone deploy would anchor to the clinic's zone via VTIMEZONE + TZID.
 function toIcsFloating(d: Date): string {
   return toIcsUtc(d).replace(/Z$/, "");
 }

@@ -15,8 +15,7 @@ export interface BedrockAdapterConfig {
   maxTokens?: number;
 }
 
-// Bedrock adapter behind the same LLMProvider interface as OpenAI/DeepSeek.
-// Credentials come from the standard AWS chain (env/role) — never hard-coded.
+// Credentials come from the standard AWS chain (env/role), never hard-coded.
 export function createBedrockProvider(cfg: BedrockAdapterConfig): LLMProvider {
   const client = new BedrockRuntimeClient({
     region: cfg.region,
@@ -65,7 +64,6 @@ export function createBedrockProvider(cfg: BedrockAdapterConfig): LLMProvider {
         }),
       );
       const raw = firstText(res.output?.message?.content ?? []).toLowerCase();
-      // Substring match; no clear match -> first label (caller's safe default).
       return labels.find((l) => raw.includes(l.toLowerCase())) ?? labels[0];
     },
   };

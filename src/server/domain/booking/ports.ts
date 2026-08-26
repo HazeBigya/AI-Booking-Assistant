@@ -1,6 +1,5 @@
-// Ports: interfaces the booking core depends on, declared BY the core. The db
-// layer implements them, so the dependency arrow points db -> booking and the
-// core stays free of any DB/AI import (and swappable with an in-memory fake).
+// Interfaces declared BY the core, implemented by the db layer, so the
+// dependency arrow points db -> booking and the core stays swappable.
 
 import type { Interval } from "./availability";
 import type { ProfessionalLevel } from "./rules";
@@ -33,9 +32,7 @@ export interface Booking extends NewBooking {
   id: number;
 }
 
-// Thrown by insertBooking when the DB exclusion constraint rejects an overlap
-// (someone grabbed the slot between our check and insert). The scheduler catches
-// it and returns a friendly result.
+// Thrown when the DB exclusion constraint rejects an overlap.
 export class DoubleBookingError extends Error {
   constructor(message = "That time was just booked by someone else.") {
     super(message);
@@ -48,8 +45,6 @@ export interface BookingRepository {
   getServiceByCode(code: string): Promise<Service | null>;
   listProfessionalsForService(serviceId: number): Promise<Professional[]>;
   getBookingsForProfessionalOnDay(professionalId: number, day: Date): Promise<Interval[]>;
-  // A patient's own booked appointments that day — used to stop a patient being
-  // double-booked across dentists.
   getBookingsForPatientOnDay(patientEmail: string, day: Date): Promise<Interval[]>;
   // MUST throw DoubleBookingError if the exclusion constraint fires.
   insertBooking(booking: NewBooking): Promise<Booking>;

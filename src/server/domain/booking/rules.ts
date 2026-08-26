@@ -1,5 +1,7 @@
-// Timezone simplification: the DB's UTC clock is treated as clinic-local, so
-// "09:00 clinic time" == 09:00 UTC. All UTC date methods below encode that.
+// Clinic hours are wall-clock rules ("we open at 9"), so every check below runs
+// in the clinic's zone. Instants stay UTC everywhere; only the reading is zoned.
+
+import { partsInZone, sameZonedDay, zonedTimeToUtc } from "./timezone";
 
 export type ProfessionalLevel = "junior" | "senior";
 
@@ -7,8 +9,19 @@ export const CLINIC = {
   openHour: 9,
   closeHour: 17,
   slotGranularityMin: 30,
-  workingDays: [1, 2, 3, 4, 5], // Mon–Fri; JS getUTCDay(): 0=Sun … 6=Sat
+  workingDays: [1, 2, 3, 4, 5], // Mon–Fri; 0=Sun … 6=Sat
+  // Blank CLINIC_TIMEZONE falls back to the machine's zone; start.sh passes the
+  // host's in, since containers run UTC. Tests pin it in vitest.config.ts.
+  timeZone: process.env.CLINIC_TIMEZONE?.trim() || hostTimeZone(),
 } as const;
+
+function hostTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 
 // professional_services is the source of truth; this mirror lets the scheduler
 // reject impossible requests cheaply and keeps the rule unit-testable.
@@ -21,42 +34,47 @@ export function canLevelPerform(level: ProfessionalLevel, serviceCode: string): 
   return SERVICE_CODES_BY_LEVEL[level].includes(serviceCode);
 }
 
-function minutesIntoDay(d: Date): number {
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
+export function isWorkingDay(d: Date, timeZone: string = CLINIC.timeZone): boolean {
+  const { weekday } = partsInZone(d, timeZone);
+  return (CLINIC.workingDays as readonly number[]).includes(weekday);
 }
 
-export function isWorkingDay(d: Date): boolean {
-  return CLINIC.workingDays.includes(d.getUTCDay() as (typeof CLINIC.workingDays)[number]);
-}
+export function isWithinClinicHours(
+  start: Date,
+  end: Date,
+  timeZone: string = CLINIC.timeZone,
+): boolean {
+  if (!isWorkingDay(start, timeZone)) return false;
+  if (!sameZonedDay(start, end, timeZone)) return false;
 
-export function isWithinClinicHours(start: Date, end: Date): boolean {
-  if (!isWorkingDay(start)) return false;
-  const sameDay =
-    start.getUTCFullYear() === end.getUTCFullYear() &&
-    start.getUTCMonth() === end.getUTCMonth() &&
-    start.getUTCDate() === end.getUTCDate();
-  if (!sameDay) return false;
-
+  const s = partsInZone(start, timeZone);
+  const e = partsInZone(end, timeZone);
   const open = CLINIC.openHour * 60;
   const close = CLINIC.closeHour * 60;
-  return minutesIntoDay(start) >= open && minutesIntoDay(end) <= close;
+  return s.hour * 60 + s.minute >= open && e.hour * 60 + e.minute <= close;
 }
 
-// Valid grid starts on `day` for a `durationMin` appointment that finishes by
-// close. Only the UTC calendar date of `day` is used; [] on non-working days.
-export function enumerateSlotStarts(day: Date, durationMin: number): Date[] {
-  if (!isWorkingDay(day)) return [];
+// Grid starts on `day` for an appointment that finishes by close; [] on
+// non-working days. Returns instants, one per clinic-local grid time.
+export function enumerateSlotStarts(
+  day: Date,
+  durationMin: number,
+  timeZone: string = CLINIC.timeZone,
+): Date[] {
+  if (!isWorkingDay(day, timeZone)) return [];
 
+  const { year, month, day: dayOfMonth } = partsInZone(day, timeZone);
   const starts: Date[] = [];
   const open = CLINIC.openHour * 60;
   const close = CLINIC.closeHour * 60;
 
   for (let m = open; m + durationMin <= close; m += CLINIC.slotGranularityMin) {
-    const start = new Date(
-      Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), 0, 0, 0, 0),
+    starts.push(
+      zonedTimeToUtc(
+        { year, month, day: dayOfMonth, hour: Math.floor(m / 60), minute: m % 60 },
+        timeZone,
+      ),
     );
-    start.setUTCMinutes(m);
-    starts.push(start);
   }
   return starts;
 }

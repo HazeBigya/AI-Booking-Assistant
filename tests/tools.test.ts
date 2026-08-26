@@ -33,7 +33,7 @@ describe("runTool dispatch guards", () => {
       const ctx: ToolContext = { authedEmail: "test@example.com" };
       const past = { ...futureBooking, start: "2020-01-01T09:00:00Z" };
       const out = JSON.parse(await runTool("create_booking", JSON.stringify(past), ctx));
-      expect(out.error).toMatch(/past/i);
+      expect(out.error).toMatch(/already passed/i);
     });
 
     it("rejects a malformed start date", async () => {

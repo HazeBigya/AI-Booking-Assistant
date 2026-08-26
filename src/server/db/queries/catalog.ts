@@ -1,5 +1,4 @@
-// Read-only presentation data for the AI tools: descriptions, prices, expertise.
-// Separate from the booking core (which only cares about scheduling correctness).
+// Presentation data for the AI tools — separate from the scheduling core.
 import { asc, eq } from "drizzle-orm";
 import { db } from "../client";
 import { professionals, professionalServices, services } from "../schema";

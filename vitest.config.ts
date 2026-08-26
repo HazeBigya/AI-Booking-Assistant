@@ -12,5 +12,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // The clinic zone otherwise defaults to whatever machine runs the suite, so
+    // pin it: these assertions are about the logic, not about where you live.
+    env: { CLINIC_TIMEZONE: "UTC" },
   },
 });

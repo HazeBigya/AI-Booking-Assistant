@@ -1,8 +1,7 @@
-// Orchestration the AI calls as tools. Deterministic; trusts the model for
-// nothing — every rule is re-checked here against the BookingRepository port.
+// Deterministic orchestration: every rule is re-checked here, against the port.
 
 import { computeAvailableSlots, overlaps, type Interval } from "./availability";
-import { isWithinClinicHours, addMinutes } from "./rules";
+import { CLINIC, enumerateSlotStarts, isWithinClinicHours, addMinutes } from "./rules";
 import {
   DoubleBookingError,
   type BookingRepository,
@@ -25,11 +24,9 @@ export function listServices(repo: BookingRepository): Promise<Service[]> {
   return repo.listServices();
 }
 
-// Per-professional free slots for a service on a day. Empty options => nobody
-// qualified, or everyone fully booked.
 export async function findAvailability(
   repo: BookingRepository,
-  input: { serviceCode: string; day: Date },
+  input: { serviceCode: string; day: Date; now?: Date },
 ): Promise<Availability | { error: string }> {
   const service = await repo.getServiceByCode(input.serviceCode);
   if (!service) return { error: `Unknown service code "${input.serviceCode}".` };
@@ -46,6 +43,7 @@ export async function findAvailability(
       day: input.day,
       durationMin: service.durationMinutes,
       existingBookings,
+      now: input.now,
     });
     if (slots.length > 0) options.push({ professional, slots });
   }
@@ -53,13 +51,59 @@ export async function findAvailability(
   return { service, options };
 }
 
-// One dentist's free slots for a service on a day. Backs the check_availability
-// tool, after the patient has chosen a specific dentist.
+// "Fully booked" and "too late in the day" are different answers to the patient.
+export type NoSlotsReason = "closed" | "too_late_today" | "fully_booked";
+
+function explainNoSlots(params: {
+  day: Date;
+  durationMin: number;
+  now?: Date;
+  timeZone?: string;
+}): { reason: NoSlotsReason; note: string } {
+  const { day, durationMin, now, timeZone = CLINIC.timeZone } = params;
+  const gridStarts = enumerateSlotStarts(day, durationMin, timeZone);
+
+  if (gridStarts.length === 0) {
+    return {
+      reason: "closed",
+      note:
+        `The clinic is closed that day, or a ${durationMin}-minute appointment ` +
+        `cannot finish before closing time. Offer the next working day.`,
+    };
+  }
+  if (now && gridStarts.every((start) => start.getTime() <= now.getTime())) {
+    return {
+      reason: "too_late_today",
+      note:
+        `It is already too late in the day: a ${durationMin}-minute appointment ` +
+        `can no longer start and finish before the clinic closes. Tell the patient ` +
+        `this and offer the next working day — do NOT offer any time today.`,
+    };
+  }
+  return {
+    reason: "fully_booked",
+    note: "That dentist has no free time left on that day. Offer another day or another dentist.",
+  };
+}
+
 export async function findAvailabilityForProfessional(
   repo: BookingRepository,
-  input: { serviceCode: string; professionalId: number; day: Date; patientEmail?: string },
+  input: {
+    serviceCode: string;
+    professionalId: number;
+    day: Date;
+    patientEmail?: string;
+    now?: Date;
+  },
 ): Promise<
-  { service: Service; professional: Professional; slots: Date[] } | { error: string }
+  | {
+      service: Service;
+      professional: Professional;
+      slots: Date[];
+      noSlotsReason?: NoSlotsReason;
+      note?: string;
+    }
+  | { error: string }
 > {
   const service = await repo.getServiceByCode(input.serviceCode);
   if (!service) return { error: `Unknown service code "${input.serviceCode}".` };
@@ -78,9 +122,9 @@ export async function findAvailabilityForProfessional(
     day: input.day,
     durationMin: service.durationMinutes,
     existingBookings,
+    now: input.now,
   });
 
-  // If we know the patient, hide slots that clash with their own appointments.
   if (input.patientEmail) {
     const patientBookings = await repo.getBookingsForPatientOnDay(input.patientEmail, input.day);
     slots = slots.filter((start) => {
@@ -89,17 +133,26 @@ export async function findAvailabilityForProfessional(
     });
   }
 
+  if (slots.length === 0) {
+    const { reason, note } = explainNoSlots({
+      day: input.day,
+      durationMin: service.durationMinutes,
+      now: input.now,
+    });
+    return { service, professional, slots, noSlotsReason: reason, note };
+  }
+
   return { service, professional, slots };
 }
 
 export type BookingResult =
-  // Includes the resolved professional + service so the confirmation is grounded
-  // in what was actually booked, not the model's memory.
+  // Carries the resolved professional + service so confirmations are grounded.
   | { ok: true; booking: Booking; professional: Professional; service: Service }
   | { ok: false; reason: BookingRejectionReason; message: string };
 
 export type BookingRejectionReason =
   | "unknown_service"
+  | "in_past"
   | "outside_hours"
   | "not_qualified"
   | "slot_taken"
@@ -113,6 +166,7 @@ export async function createBooking(
     start: Date;
     patientName: string;
     patientEmail: string;
+    now?: Date;
   },
 ): Promise<BookingResult> {
   const service = await repo.getServiceByCode(input.serviceCode);
@@ -121,6 +175,15 @@ export async function createBooking(
       ok: false,
       reason: "unknown_service",
       message: `Unknown service code "${input.serviceCode}".`,
+    };
+  }
+
+  // Checked here as well as at the tool boundary so no caller can bypass it.
+  if (input.now && input.start.getTime() <= input.now.getTime()) {
+    return {
+      ok: false,
+      reason: "in_past",
+      message: "That time has already passed. Please pick a later time.",
     };
   }
 
@@ -158,7 +221,6 @@ export async function createBooking(
     };
   }
 
-  // The patient must be free too — no booking them into two overlapping slots.
   const patientBookings = await repo.getBookingsForPatientOnDay(input.patientEmail, input.start);
   if (patientBookings.some((b) => overlaps(candidate, b))) {
     return {

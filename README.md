@@ -12,11 +12,12 @@ database.
 
 ## Quick start (one command)
 
-Prerequisites: Docker Desktop, and one AI API key (DeepSeek is cheapest; OpenAI
-also works).
+Prerequisites: Docker Desktop, and one AI API key from any supported provider —
+OpenAI, Anthropic, DeepSeek, Gemini, OpenRouter, or any OpenAI-compatible
+endpoint. DeepSeek is cheapest for a demo.
 
 ```bash
-cp .env.example .env      # set LLM_PROVIDERS + the matching API key
+cp .env.example .env      # set AI_PROVIDER + that provider's API key
 npm run start:all         # starts Docker, Postgres, migrate+seed, and the app
 ```
 
@@ -38,12 +39,11 @@ npm run dev               # http://localhost:3000, hot reload
 
 | Var | Purpose |
 |-----|---------|
-| `LLM_PROVIDERS` | Comma-separated fallback chain, tried in order (e.g. `deepseek,openrouter:model`). Each entry is `provider` or `provider:model`. Providers with missing keys are skipped. |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | used for `openai` |
-| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | used for `deepseek` |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | used for `gemini` (native `@google/genai`) |
-| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | used for `openrouter` (gateway to many models) |
-| `AWS_REGION` / `BEDROCK_MODEL_ID` | used for `bedrock` (creds via the AWS chain) |
+| `AI_PROVIDER` | Which provider to use: `anthropic`, `openai`, `gemini`, `deepseek`, `openrouter`, `custom`. A comma-separated list is a **failover chain in that order** (`anthropic,deepseek`); an entry may pin a model inline (`openrouter:z-ai/glm-5.2:free`, split on the first colon so ids may contain `:`). Entries whose key is missing are skipped. `LLM_PROVIDERS` is a backwards-compatible alias. |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `OPENROUTER_API_KEY` (+ matching `*_MODEL`) | one key per vendor — which is what lets several be configured at once for failover |
+| `CUSTOM_BASE_URL` / `CUSTOM_API_KEY` / `CUSTOM_MODEL` | with `AI_PROVIDER=custom`: any OpenAI-compatible endpoint (Qwen, Kimi, Groq, local Ollama/vLLM) |
+| `AWS_REGION` / `BEDROCK_MODEL_ID` | used for `bedrock` (creds via the AWS chain, native adapter) |
+| `CLINIC_TIMEZONE` | IANA name for the clinic's wall clock — sets opening hours and which slots exist |
 | `AUTH_SECRET` | signs the session JWT |
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | email transport for OTP codes + calendar invites (falls back to console) |
 | `DATABASE_URL` | Postgres connection (localhost for host dev) |
@@ -94,11 +94,15 @@ drizzle/                 generated migrations + custom double-booking guard
 - **Server-authoritative chat.** Each turn is persisted to `chat_messages` (with
   token usage); the last 15 are loaded for context and restored on refresh. A
   session is linked to its patient once the email is verified.
-- **Provider-agnostic with a fallback chain.** The LLM sits behind a neutral
-  `LLMProvider` interface. Adapters: OpenAI + DeepSeek + OpenRouter (shared
-  OpenAI wire format, different `baseURL`), Gemini (native SDK), and Bedrock
-  (Converse). `LLM_PROVIDERS` composes a priority chain; if all fail, the bot
-  returns an honest "can't connect" message. Adding a vendor = one adapter.
+- **Bring your own AI.** The LLM sits behind a neutral `LLMProvider` interface.
+  Most vendors expose an OpenAI-compatible endpoint, so one adapter serves
+  OpenAI, Anthropic, DeepSeek, Gemini and OpenRouter — **adding a vendor is a row
+  in a table, not an adapter** — and `custom` + `CUSTOM_BASE_URL` reaches any
+  compatible endpoint (Qwen, Kimi, Groq, local Ollama) with no code change at
+  all. Bedrock keeps a native Converse adapter, which is also what proves the
+  seam isn't secretly OpenAI-shaped. `LLM_PROVIDERS` composes a failover chain;
+  if every provider fails the bot returns an honest "can't connect" message.
+  Model choice never affects correctness — see the guardrails above.
 - **SQL injection has no path.** The model emits typed tool arguments (validated
   with zod), never SQL; queries are parametrized via Drizzle. Money is stored as
   integer dollars.
@@ -106,8 +110,10 @@ drizzle/                 generated migrations + custom double-booking guard
 ## Tests
 
 ```bash
-npm test        # 49 tests: pure booking core, tool-dispatch guards,
-                # .ics builder, fallback chain, rate limiter, output validator
+npm test        # 82 tests: pure booking core, clinic-timezone conversion,
+                # tool-dispatch guards, the fabricated-confirmation guard,
+                # provider config resolution, .ics builder, fallback chain,
+                # rate limiter, output validator
 ```
 
 No database is required — DB-touching paths are covered by pure logic and the
@@ -115,9 +121,17 @@ tool-layer guard branches that short-circuit before I/O.
 
 ## Documented simplifications
 
-- UTC is treated as clinic-local (single timezone); `.ics` uses floating time.
+- The clinic runs on one time zone (`CLINIC_TIMEZONE`, IANA name). Instants are
+  stored in UTC; opening hours, the slot grid and every label shown to a patient
+  are evaluated on that clock via `Intl`, so DST is handled by the tz database.
+  The browser also reports the *patient's* zone with each message — validated
+  server-side, and used only to add "your local time" alongside the clinic time.
+  It never shifts opening hours: those belong to the clinic, not the visitor.
+  `.ics` uses floating time.
 - Rate limiting is in-memory (single instance); Redis is the scale path.
-- Reschedule/cancel is modeled (`status = booked | cancelled`) but has no flow yet.
+- Cancelling is implemented (soft cancel: `status = 'cancelled'` frees the slot via
+  the partial constraint and keeps history, plus an `.ics` `METHOD:CANCEL`).
+  Rescheduling is not — today it is cancel, then book again.
 - Choosing the *correct dentist* from free text is model-dependent (mitigated by
   the system prompt + a swappable stronger model); every other booking invariant
   is enforced deterministically.

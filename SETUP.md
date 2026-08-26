@@ -43,15 +43,29 @@ so it behaves the same on every computer.
 
 ## Step 2 — Add your AI key
 
-The receptionist needs an AI provider to talk. You need **one** key. The cheapest
-option is **DeepSeek** (a few cents covers heavy testing); **OpenAI** also works.
+The receptionist needs an AI provider to talk. You need **one** key, from whichever
+company you prefer — you choose the provider, the quality level, and you pay them
+directly.
 
 ### Get a key (pick one)
 
-- **DeepSeek:** sign up at https://platform.deepseek.com → **API Keys** →
-  **Create new key**. Copy it (starts with `sk-`).
-- **OpenAI:** sign up at https://platform.openai.com → **API keys** →
-  **Create new secret key**. Copy it (starts with `sk-`).
+You pay this company directly for what the assistant uses. The key is stored only
+in your own settings file.
+
+| Provider | Sign up at | Notes |
+|---|---|---|
+| **DeepSeek** | https://platform.deepseek.com | Cheapest — a few cents covers heavy testing |
+| **OpenAI** | https://platform.openai.com/api-keys | |
+| **Anthropic (Claude)** | https://platform.claude.com/settings/keys | |
+| **Google Gemini** | https://aistudio.google.com/app/apikey | |
+| **OpenRouter** | https://openrouter.ai/keys | One key, hundreds of models from all the above |
+
+Create a key and copy it (most start with `sk-`).
+
+> The assistant works correctly whichever you choose. Availability, double-booking,
+> past dates and patient identity are enforced by the app itself, not by the AI —
+> a cheaper model cannot book you into a taken slot. A stronger model mainly
+> sounds more natural.
 
 ### Put the key in the settings file
 
@@ -64,18 +78,28 @@ option is **DeepSeek** (a few cents covers heavy testing); **OpenAI** also works
      cd /path/to/booking-chat-bot
      cp .env.example .env
      ```
-3. Open **`.env`** in TextEdit and set the line that matches your key:
-   - If you used DeepSeek:
-     ```
-     LLM_PROVIDERS=deepseek
-     DEEPSEEK_API_KEY=sk-your-key-here
-     ```
-   - If you used OpenAI:
-     ```
-     LLM_PROVIDERS=openai
-     OPENAI_API_KEY=sk-your-key-here
-     ```
-4. Save and close.
+3. Open **`.env`** in TextEdit. Set `AI_PROVIDER` to the provider you signed up
+   with, then paste your key on that provider's line. For example, for Claude:
+   ```
+   AI_PROVIDER=anthropic
+
+   ANTHROPIC_API_KEY=sk-your-key-here
+   ```
+   Leave the other providers' key lines empty.
+4. Optional: list two providers, and the second is used automatically if the
+   first is down or out of credit:
+   ```
+   AI_PROVIDER=anthropic,deepseek
+   ```
+   Fill in a key for each one you list.
+5. Save and close.
+
+> **Time zone is automatic.** The clinic runs on your computer's time zone unless
+> you say otherwise, so "9:00 AM" means 9:00 AM to you. If the clinic is somewhere
+> else, set `CLINIC_TIMEZONE` in `.env` to its
+> [IANA name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+> (`Asia/Kathmandu`, `Asia/Taipei`, …). Patients in other countries always see
+> clinic time, plus their own local time alongside it.
 
 > **Email is optional.** Without email settings, login codes and booking
 > confirmations print to the app's log window instead of being emailed — perfect

@@ -10,8 +10,7 @@ export interface SmtpConfig {
   from: string;
 }
 
-// Generic SMTP adapter (nodemailer) — works with Gmail, Brevo, or any SMTP host.
-// Sends to arbitrary recipients without owning a domain.
+// Any SMTP host. Sends to arbitrary recipients without owning a domain.
 export function createSmtpMailer(cfg: SmtpConfig): Mailer {
   const transport = nodemailer.createTransport({
     host: cfg.host,
@@ -36,7 +35,6 @@ export function createSmtpMailer(cfg: SmtpConfig): Mailer {
         to: invite.attendees.map((a) => a.email),
         subject: invite.summary,
         text: invite.description,
-        // nodemailer sets the correct text/calendar MIME so clients show the invite.
         icalEvent: { method: invite.method ?? "REQUEST", content: buildIcs(invite) },
       });
     },

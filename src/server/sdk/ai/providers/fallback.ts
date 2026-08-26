@@ -1,9 +1,7 @@
 import type { ChatRequest, ChatResponse, LLMProvider } from "./types";
 
-// Tries providers in priority order; returns the first success. Per-call — each
-// request carries full context, so falling through mid-conversation is safe.
-// Throws only if ALL providers fail; the caller then shows a deterministic,
-// honest "can't connect" message rather than a crash.
+// Per-call: each request carries full context, so falling through
+// mid-conversation is safe. Throws only if ALL providers fail.
 export function createFallbackChain(providers: LLMProvider[]): LLMProvider {
   if (providers.length === 1) return providers[0];
 
@@ -28,7 +26,6 @@ export function createFallbackChain(providers: LLMProvider[]): LLMProvider {
         try {
           return await provider.classify(input, labels);
         } catch {
-          // try the next provider
         }
       }
       return labels[0]; // gate fails open

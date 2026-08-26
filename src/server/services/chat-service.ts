@@ -5,24 +5,27 @@ import { SYSTEM_PROMPT } from "@server/sdk/ai/prompt";
 import type { ToolContext } from "@server/sdk/ai/tools";
 import { getRecentChatMessages, linkPatientToSession, saveChatMessage } from "@server/db/queries/chat";
 import { findOrCreatePatient } from "@server/auth/patients";
+import { CLINIC } from "@server/domain/booking/rules";
+import {
+  formatZonedDate,
+  formatZonedTime,
+  zonedDateKey,
+} from "@server/domain/booking/timezone";
 
 const CONTEXT_WINDOW = 15; // recent messages sent to the model
 
 export interface ChatReply {
   reply: string;
   totalTokens: number;
-  // Set when the patient verified their email this turn — the route persists a
-  // session cookie for this address.
   authenticateAs?: string;
 }
 
-// Server-authoritative chat: loads recent history from the DB, runs the guarded
-// tool loop, and persists both the user message and the reply (with token usage).
-// Guardrails: strict system prompt, tools-only actions, output validator.
+// Server-authoritative: history from the DB, guarded tool loop, turn persisted.
 export async function handleChat(
   sessionId: string,
   userMessage: string,
   authedEmail?: string,
+  patientTimeZone?: string,
 ): Promise<ChatReply> {
   const authLine = authedEmail
     ? `The patient is ALREADY logged in and verified as ${authedEmail}. Treat them as ` +
@@ -36,12 +39,15 @@ export async function handleChat(
   // Auth status is placed FIRST (primacy) and LAST (recency) so a weak model is
   // far less likely to overlook that the patient is already logged in.
   const messages: ChatMessage[] = [
-    { role: "system", content: `${authLine}\n\n${SYSTEM_PROMPT}\n\n${currentDateLine()}\n${authLine}` },
+    {
+      role: "system",
+      content: `${authLine}\n\n${SYSTEM_PROMPT}\n\n${currentDateLine(patientTimeZone)}\n${authLine}`,
+    },
     ...history,
     { role: "user", content: userMessage },
   ];
   // ctx is mutated by verify_login_code when the patient authenticates mid-chat.
-  const ctx: ToolContext = { authedEmail };
+  const ctx: ToolContext = { authedEmail, patientTimeZone };
 
   let reply: string;
   let totalTokens = 0;
@@ -50,19 +56,14 @@ export async function handleChat(
     reply = validateOutput(result.reply);
     totalTokens = result.totalTokens;
   } catch (err) {
-    // Every LLM provider in the chain failed — be honest, don't crash.
     console.error("all LLM providers failed:", err);
     reply = "I'm sorry — I can't reach our booking assistant right now. Please try again in a moment.";
   }
 
-  // Persist the turn (user first for chronological order, then the reply + tokens).
   await saveChatMessage(sessionId, "user", userMessage);
   await saveChatMessage(sessionId, "assistant", reply, totalTokens);
 
-  // If they verified their email this turn, tie this conversation to that
-  // patient. Name is unknown at verify time; use the email local part as a
-  // placeholder (a real name is captured at booking). find-or-create is safe
-  // whether or not the patient already exists.
+  // Name is unknown at verify time; the email local part stands in until booking.
   const authenticateAs = ctx.authenticatedAs;
   if (authenticateAs) {
     const patient = await findOrCreatePatient(authenticateAs, authenticateAs.split("@")[0]);
@@ -72,10 +73,22 @@ export async function handleChat(
   return { reply, totalTokens, authenticateAs };
 }
 
-// Clinic time is UTC by our simplification, so read the date in UTC.
-function currentDateLine(): string {
+// The model needs the current TIME, not just the date, or it cannot tell that
+// this morning's slots have already gone.
+function currentDateLine(patientTimeZone?: string): string {
   const now = new Date();
-  const iso = now.toISOString().slice(0, 10);
-  const weekday = now.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
-  return `The current date is ${iso} (${weekday}).`;
+  let line =
+    `Right now at the clinic it is ${formatZonedTime(now, CLINIC.timeZone)} on ` +
+    `${formatZonedDate(now, CLINIC.timeZone)} (${zonedDateKey(now, CLINIC.timeZone)}, ` +
+    `clinic time zone ${CLINIC.timeZone}). Any time earlier than this today has ` +
+    `already passed and cannot be booked.`;
+
+  if (patientTimeZone && patientTimeZone !== CLINIC.timeZone) {
+    line +=
+      ` This patient is in ${patientTimeZone}, where it is currently ` +
+      `${formatZonedTime(now, patientTimeZone)}. All appointment times you state are ` +
+      `CLINIC times; when a tool result includes "yourLocalTime", mention it too so ` +
+      `they know what the appointment is on their own clock.`;
+  }
+  return line;
 }

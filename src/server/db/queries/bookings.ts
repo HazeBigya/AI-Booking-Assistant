@@ -15,7 +15,6 @@ export async function getBookingsForProfessionalOnDay(
   professionalId: number,
   day: Date,
 ): Promise<Interval[]> {
-  // Half-open UTC window [dayStart, nextDay); filter on start_time.
   const dayStart = new Date(day);
   dayStart.setUTCHours(0, 0, 0, 0);
   const nextDay = new Date(dayStart);
@@ -70,11 +69,8 @@ export interface CancelledBooking {
   patientEmail: string;
 }
 
-// Soft-cancels one of the patient's OWN still-booked appointments. The ownership
-// + state checks live in the WHERE clause: a patient can only cancel a row that
-// is theirs and currently 'booked' (prevents IDOR and double-cancel). Soft-cancel
-// (not delete) frees the slot — the exclusion constraint is partial on
-// status='booked' — while preserving history. Returns null if nothing matched.
+// Ownership and state live in the WHERE clause: only your own 'booked' row.
+// Soft-cancel frees the slot (the constraint is partial on 'booked') and keeps history.
 export async function cancelBookingForPatient(
   bookingId: number,
   patientEmail: string,
@@ -125,9 +121,7 @@ export async function cancelBookingForPatient(
 
 export async function insertBooking(b: NewBooking): Promise<Booking> {
   try {
-    // Resolve snapshot fields from authoritative tables at persistence time:
-    //  - patient_id: the FK for the verified patient (identity is their email).
-    //  - price: this dentist's price for this service (override, else base).
+    // Snapshot patient_id and the price in force at booking time.
     const patientId = await resolvePatientId(b.patientEmail);
     const price = await resolvePrice(b.professionalId, b.serviceId);
 
@@ -146,20 +140,17 @@ export async function insertBooking(b: NewBooking): Promise<Booking> {
       .returning({ id: bookings.id });
     return { ...b, id: rows[0].id };
   } catch (err: unknown) {
-    // Exclusion constraint fired -> convert to the domain error.
     if (isExclusionViolation(err)) throw new DoubleBookingError();
     throw err;
   }
 }
 
-// The verified patient row (created at email verification). Nullable-safe: if
-// somehow absent, the email snapshot still records who booked.
+// Nullable-safe: without a patient row the email snapshot still records who booked.
 async function resolvePatientId(email: string): Promise<number | undefined> {
   const rows = await db.select({ id: patients.id }).from(patients).where(eq(patients.email, email)).limit(1);
   return rows[0]?.id;
 }
 
-// This dentist's price for this service: their override, else the service base.
 async function resolvePrice(professionalId: number, serviceId: number): Promise<number | undefined> {
   const rows = await db
     .select({ override: professionalServices.priceOverride, base: services.basePrice })

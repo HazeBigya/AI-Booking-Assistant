@@ -21,8 +21,7 @@ export function Chat() {
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Refocus the input once it re-enables, so you can type the next message
-  // without clicking back into the box.
+  // Refocus once the input re-enables, so you can keep typing.
   useEffect(() => {
     if (!loading) inputRef.current?.focus();
   }, [loading]);
@@ -31,7 +30,6 @@ export function Chat() {
 
   useEffect(() => {
     refreshSession();
-    // Restore the persisted conversation (survives refresh); keep the greeting if empty.
     getChatHistory()
       .then((r) => {
         if (r.messages.length > 0) setMessages(r.messages);
@@ -43,7 +41,6 @@ export function Chat() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Start a fresh conversation — clears server history and resets the view.
   async function newConversation() {
     try {
       await resetChat();
