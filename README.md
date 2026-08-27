@@ -110,7 +110,7 @@ drizzle/                 generated migrations + custom double-booking guard
 ## Tests
 
 ```bash
-npm test        # 82 tests: pure booking core, clinic-timezone conversion,
+npm test        # 83 tests: pure booking core, clinic-timezone conversion,
                 # tool-dispatch guards, the fabricated-confirmation guard,
                 # provider config resolution, .ics builder, fallback chain,
                 # rate limiter, output validator
@@ -127,7 +127,8 @@ tool-layer guard branches that short-circuit before I/O.
   The browser also reports the *patient's* zone with each message — validated
   server-side, and used only to add "your local time" alongside the clinic time.
   It never shifts opening hours: those belong to the clinic, not the visitor.
-  `.ics` uses floating time.
+  `.ics` carries absolute UTC (`DTSTART:...Z`), so every calendar renders the
+  appointment in its own viewer's zone.
 - Rate limiting is in-memory (single instance); Redis is the scale path.
 - Cancelling is implemented (soft cancel: `status = 'cancelled'` frees the slot via
   the partial constraint and keeps history, plus an `.ics` `METHOD:CANCEL`).

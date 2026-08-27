@@ -6,7 +6,7 @@ import { getAppointmentsForPatient } from "@server/db/queries/appointments";
 import { cancelBookingForPatient } from "@server/db/queries/bookings";
 import { pgBookingRepository } from "@server/db/queries";
 import { createBooking, findAvailabilityForProfessional } from "@server/domain/booking/scheduler";
-import { CLINIC } from "@server/domain/booking/rules";
+import { CLINIC, addMinutes } from "@server/domain/booking/rules";
 import {
   formatZonedDate,
   formatZonedTime,
@@ -223,7 +223,14 @@ export async function runTool(
         day: clinicDayLabel(day),
         clinicTimeZone: CLINIC.timeZone,
         currentClinicTime: formatZonedTime(now, CLINIC.timeZone),
-        slots: result.slots.map((s) => ({ start: s.toISOString(), ...timeLabels(s, ctx) })),
+        slots: result.slots.map((s) => {
+          const ends = addMinutes(s, result.service.durationMinutes);
+          return {
+            start: s.toISOString(),
+            ...timeLabels(s, ctx),
+            ends: formatZonedTime(ends, CLINIC.timeZone),
+          };
+        }),
       };
 
       // Lets the model tell "you're already booked" from "the dentist is booked".

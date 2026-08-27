@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildIcs } from "@server/sdk/mailer/ics";
+import { zonedTimeToUtc } from "@server/domain/booking/timezone";
 
 const invite = {
   uid: "booking-1@brightsmile",
@@ -15,11 +16,23 @@ const invite = {
 };
 
 describe("buildIcs", () => {
-  it("emits DTSTART/DTEND as floating wall-clock (no Z) so the time doesn't shift", () => {
+  it("emits DTSTART/DTEND as absolute UTC so calendars render the right local time", () => {
     const ics = buildIcs(invite);
-    expect(ics).toContain("DTSTART:20260824T090000");
-    expect(ics).not.toContain("DTSTART:20260824T090000Z");
-    expect(ics).toContain("DTEND:20260824T100000");
+    expect(ics).toContain("DTSTART:20260824T090000Z");
+    expect(ics).toContain("DTEND:20260824T100000Z");
+  });
+
+  it("survives a clinic in a non-UTC zone: 9:00 Kathmandu lands at 03:15Z, not 09:00", () => {
+    // The regression: floating time wrote 031500 with no zone, so a calendar in
+    // Kathmandu read it as 3:15 AM instead of the 9:00 AM that was booked.
+    const kathmandu9am = {
+      ...invite,
+      start: zonedTimeToUtc({ year: 2026, month: 8, day: 27, hour: 9 }, "Asia/Kathmandu"),
+      end: zonedTimeToUtc({ year: 2026, month: 8, day: 27, hour: 11, minute: 30 }, "Asia/Kathmandu"),
+    };
+    const ics = buildIcs(kathmandu9am);
+    expect(ics).toContain("DTSTART:20260827T031500Z");
+    expect(ics).toContain("DTEND:20260827T054500Z");
   });
 
   it("stamps DTSTAMP in UTC (with Z)", () => {

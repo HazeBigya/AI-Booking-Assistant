@@ -1,30 +1,33 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { getChatHistory, resetChat, sendChat, type ChatTurn } from "@client/api/chat";
 import { getSession, logout, type SessionUser } from "@client/api/auth";
+import { Composer } from "./chat/Composer";
+import { MessageBubble } from "./chat/MessageBubble";
+import { MessageSkeleton } from "./chat/MessageSkeleton";
+import { SessionRail } from "./chat/SessionRail";
+import { Suggestions } from "./chat/Suggestions";
+import { TypingIndicator } from "./chat/TypingIndicator";
+import type { ConversationState } from "./chat/types";
 
 const GREETING: ChatTurn = {
   role: "assistant",
-  content: "Hi! I'm the clinic's virtual receptionist. I can help you explore our services and book an appointment. What do you need?",
+  content:
+    "Hi — I'm the receptionist at Bright Smile. I can talk you through our services, tell you which dentist suits what you need, and book you in.",
 };
 
 export function Chat() {
   const [messages, setMessages] = useState<ChatTurn[]>([GREETING]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [state, setState] = useState<ConversationState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [me, setMe] = useState<SessionUser | null>(null);
   const sending = useRef(false); // synchronous guard against double-submit
   const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Refocus once the input re-enables, so you can keep typing.
-  useEffect(() => {
-    if (!loading) inputRef.current?.focus();
-  }, [loading]);
+  const busy = state === "thinking";
+  const untouched = messages.length === 1;
 
   const refreshSession = () => getSession().then((r) => setMe(r.session)).catch(() => {});
 
@@ -39,110 +42,118 @@ export function Chat() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, state]);
 
   async function newConversation() {
     try {
       await resetChat();
     } catch {
-      /* even if the call fails, reset the view so the user isn't stuck */
+      /* reset the view regardless, so nobody gets stuck in a bad thread */
     }
     setMessages([GREETING]);
     setInput("");
     setError(null);
+    setState("idle");
   }
 
-  async function send() {
-    const text = input.trim();
-    if (!text || sending.current) return;
+  async function send(text: string = input) {
+    const body = text.trim();
+    if (!body || sending.current) return;
     sending.current = true;
 
-    const next = [...messages, { role: "user", content: text } as ChatTurn];
+    const next = [...messages, { role: "user", content: body } as ChatTurn];
     setMessages(next);
     setInput("");
     setError(null);
-    setLoading(true);
+    setState("thinking");
     try {
-      const { reply } = await sendChat(text); // server holds history; send just the new message
+      const { reply } = await sendChat(body); // the server holds the history
       setMessages([...next, { role: "assistant", content: reply }]);
-      refreshSession(); // the patient may have just verified their email in-chat
+      refreshSession(); // they may have just verified their email in-chat
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
-      setLoading(false);
+      setState("idle");
       sending.current = false;
     }
   }
 
+  // Voice is presentation-only for now: this toggles the state the UI already
+  // renders, and is where the speech engine will attach.
+  function toggleVoice() {
+    setState((s) => (s === "listening" ? "idle" : "listening"));
+  }
+
   return (
-    <div className="flex h-[100dvh] flex-col bg-slate-50">
-      <header className="flex items-center border-b bg-white px-4 py-3">
-        <span className="flex-1" />
-        <span className="font-semibold text-slate-800">🦷 Bright Smile Clinic</span>
-        <span className="flex flex-1 items-center justify-end gap-3 text-xs">
-          <button className="text-blue-600" onClick={newConversation}>
-            New conversation
-          </button>
-          {me && (
-            <span className="flex items-center gap-2">
-              <span className="text-slate-500">{me.name}</span>
-              <button
-                className="text-blue-600"
-                onClick={async () => {
-                  await logout();
-                  setMe(null);
-                }}
-              >
-                Log out
-              </button>
-            </span>
-          )}
-        </span>
-      </header>
+    <div className="flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row lg:overflow-hidden">
+      <SessionRail
+        me={me}
+        state={state}
+        onNewConversation={newConversation}
+        onLogout={async () => {
+          await logout();
+          setMe(null);
+        }}
+      />
 
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-            <div
-              className={
-                "max-w-[85%] rounded-2xl px-4 py-2 text-sm " +
-                (m.role === "user" ? "bg-blue-600 text-white" : "bg-white text-slate-800 shadow")
-              }
-            >
-              {m.role === "assistant" ? (
-                <div className="prose prose-sm max-w-none overflow-x-auto prose-table:my-2 prose-p:my-1.5">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                </div>
-              ) : (
-                <span className="whitespace-pre-wrap">{m.content}</span>
-              )}
+      <main className="flex min-h-0 flex-1 flex-col">
+        <div className="scrollbar-slim flex-1 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+            {untouched && (
+              <header className="mb-2 max-w-xl">
+                <h1 className="text-2xl font-medium tracking-tight sm:text-3xl">
+                  Book with a dentist, in a sentence.
+                </h1>
+                <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-soft">
+                  Tell me what you need and when. I check the real schedule before I promise anything.
+                </p>
+              </header>
+            )}
+
+            <div className="stagger flex flex-col gap-5">
+              {messages.map((m, i) => (
+                <MessageBubble key={i} turn={m} index={Math.min(i, 8)} />
+              ))}
             </div>
-          </div>
-        ))}
-        {loading && <div className="text-sm text-slate-400">typing…</div>}
-        {error && <div className="text-sm text-red-500">{error}</div>}
-        <div ref={endRef} />
-      </div>
 
-      <div className="mx-auto flex w-full max-w-2xl gap-2 p-4">
-        <input
-          ref={inputRef}
-          autoFocus
-          className="flex-1 rounded-full border px-4 py-2 text-sm outline-none focus:border-blue-500"
-          placeholder="Type a message…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          disabled={loading}
-        />
-        <button
-          className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
-          onClick={send}
-          disabled={loading}
-        >
-          Send
-        </button>
-      </div>
+            {busy && (
+              <div className="flex flex-col gap-3">
+                <TypingIndicator />
+                <MessageSkeleton />
+              </div>
+            )}
+
+            {error && (
+              <p
+                role="alert"
+                className="animate-rise rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+              >
+                {error}
+              </p>
+            )}
+
+            {untouched && !busy && <Suggestions onPick={send} />}
+
+            <div ref={endRef} />
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 border-t border-zinc-200/70 bg-zinc-50/85 px-4 py-4 backdrop-blur-md sm:px-8 lg:px-12">
+          <div className="mx-auto w-full max-w-3xl">
+            <Composer
+              value={input}
+              onChange={setInput}
+              onSend={() => send()}
+              onToggleVoice={toggleVoice}
+              state={state}
+              disabled={busy}
+            />
+            <p className="mt-2.5 px-1 text-xs text-ink-faint">
+              Availability and bookings are confirmed against the clinic's schedule, not guessed.
+            </p>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

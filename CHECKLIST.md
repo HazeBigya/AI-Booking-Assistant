@@ -69,10 +69,10 @@ Tracks what's done and what remains. Code due **Sept 4**, demo **Sept 7**.
 
 ### Frontend
 - [x] Generic HTTP fetcher; resource API modules; components never fetch
-- [x] Chat UI: markdown rendering, autofocus, login status in header
+- [x] Chat UI: markdown rendering, autofocus, session rail, voice-state shell
 
 ### Tests
-- [x] **67 tests** — booking core, clinic-timezone conversion, tool-dispatch guards
+- [x] **83 tests** — booking core, clinic-timezone conversion, tool-dispatch guards
       (auth gate, past time, IDOR, bad input), fabricated-confirmation guard,
       `.ics` builder, fallback chain, rate limiter, output validator. No DB needed.
 
@@ -81,8 +81,13 @@ Tracks what's done and what remains. Code due **Sept 4**, demo **Sept 7**.
 ## ⬜ Remaining
 
 ### Today — finalize text chat
-- [ ] **UI glow-up** — message spacing, timestamps, better typing/loading state,
-      error surfacing, mobile layout, empty state, header polish
+- [x] **UI glow-up** — asymmetric rail + conversation layout, Outfit type, zinc +
+      single desaturated accent, staggered message reveals, skeleton + typing
+      states, suggestion empty state, inline errors, tactile :active, reduced-motion
+      support. Chat.tsx split into 8 presentational leaf components.
+- [x] **Voice-ready shell** — one `ConversationState` (idle/listening/thinking/
+      speaking) drives the mic button, waveform and rail status. Visual only today;
+      the speech engine attaches behind the same union tomorrow.
 - [ ] Delete the leftover `scripts/setup.sh` + `npm run setup` (destructive, no
       server, undocumented — a non-dev who guesses "setup" wipes their data)
 - [ ] Re-test the two regression-prone flows after the prompt refactor:

@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { buildIcs } from "./ics";
+import { renderInviteEmail, renderOtpEmail } from "./message";
 import type { CalendarInvite, Mailer } from "./types";
 
 export function createResendMailer(apiKey: string, from: string): Mailer {
@@ -10,8 +11,7 @@ export function createResendMailer(apiKey: string, from: string): Mailer {
       const { error } = await resend.emails.send({
         from,
         to,
-        subject: "Your Bright Smile Clinic login code",
-        text: `Your login code is ${code}. It expires in 10 minutes.`,
+        ...renderOtpEmail(code, "Bright Smile Clinic"),
       });
       if (error) throw new Error(`Resend failed: ${error.message}`);
     },
@@ -19,8 +19,7 @@ export function createResendMailer(apiKey: string, from: string): Mailer {
       const { error } = await resend.emails.send({
         from,
         to: invite.attendees.map((a) => a.email),
-        subject: invite.summary,
-        text: invite.description,
+        ...renderInviteEmail(invite),
         attachments: [
           { filename: "invite.ics", content: Buffer.from(buildIcs(invite)).toString("base64") },
         ],

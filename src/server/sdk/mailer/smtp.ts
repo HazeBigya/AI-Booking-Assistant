@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { buildIcs } from "./ics";
+import { renderInviteEmail, renderOtpEmail } from "./message";
 import type { CalendarInvite, Mailer } from "./types";
 
 export interface SmtpConfig {
@@ -22,19 +23,15 @@ export function createSmtpMailer(cfg: SmtpConfig): Mailer {
   return {
     name: "smtp",
     async sendOtp(to: string, code: string): Promise<void> {
-      await transport.sendMail({
-        from: cfg.from,
-        to,
-        subject: "Your Bright Smile Clinic login code",
-        text: `Your login code is ${code}. It expires in 10 minutes.`,
-      });
+      const mail = renderOtpEmail(code, "Bright Smile Clinic");
+      await transport.sendMail({ from: cfg.from, to, ...mail });
     },
     async sendInvite(invite: CalendarInvite): Promise<void> {
+      const mail = renderInviteEmail(invite);
       await transport.sendMail({
         from: cfg.from,
         to: invite.attendees.map((a) => a.email),
-        subject: invite.summary,
-        text: invite.description,
+        ...mail,
         icalEvent: { method: invite.method ?? "REQUEST", content: buildIcs(invite) },
       });
     },

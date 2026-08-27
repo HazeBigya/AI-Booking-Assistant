@@ -13,8 +13,8 @@ export function buildIcs(invite: CalendarInvite): string {
     `UID:${invite.uid}`,
     `SEQUENCE:${invite.sequence ?? 0}`,
     `DTSTAMP:${toIcsUtc(new Date())}`,
-    `DTSTART:${toIcsFloating(invite.start)}`,
-    `DTEND:${toIcsFloating(invite.end)}`,
+    `DTSTART:${toIcsUtc(invite.start)}`,
+    `DTEND:${toIcsUtc(invite.end)}`,
     `SUMMARY:${escapeText(invite.summary)}`,
     `DESCRIPTION:${escapeText(invite.description)}`,
     `ORGANIZER;CN=${escapeText(invite.organizer.name)}:mailto:${invite.organizer.email}`,
@@ -29,14 +29,11 @@ export function buildIcs(invite: CalendarInvite): string {
   return lines.join("\r\n");
 }
 
+// Absolute UTC (trailing Z). We store instants, so we emit instants and let each
+// calendar render them in the viewer's zone. Floating time would be read as the
+// viewer's own wall clock and shift the appointment.
 function toIcsUtc(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-}
-
-// Floating (no Z) wall-clock, so "9:00" shows as 9:00 in any viewer's calendar.
-// A multi-timezone deploy would anchor to the clinic's zone via VTIMEZONE + TZID.
-function toIcsFloating(d: Date): string {
-  return toIcsUtc(d).replace(/Z$/, "");
 }
 
 function escapeText(value: string): string {
