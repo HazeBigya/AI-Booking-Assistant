@@ -51,16 +51,23 @@ export async function findAvailability(
   return { service, options };
 }
 
-// "Fully booked" and "too late in the day" are different answers to the patient.
-export type NoSlotsReason = "closed" | "too_late_today" | "fully_booked";
+// Each of these is a different answer to the patient, and getting them mixed up
+// makes the bot blame the dentist for the patient's own clash.
+export type NoSlotsReason =
+  | "closed"
+  | "too_late_today"
+  | "patient_busy"
+  | "fully_booked";
 
 function explainNoSlots(params: {
   day: Date;
   durationMin: number;
   now?: Date;
   timeZone?: string;
+  // True when the dentist had free slots and only the patient's own bookings removed them.
+  dentistWasFree?: boolean;
 }): { reason: NoSlotsReason; note: string } {
-  const { day, durationMin, now, timeZone = CLINIC.timeZone } = params;
+  const { day, durationMin, now, timeZone = CLINIC.timeZone, dentistWasFree } = params;
   const gridStarts = enumerateSlotStarts(day, durationMin, timeZone);
 
   if (gridStarts.length === 0) {
@@ -78,6 +85,16 @@ function explainNoSlots(params: {
         `It is already too late in the day: a ${durationMin}-minute appointment ` +
         `can no longer start and finish before the clinic closes. Tell the patient ` +
         `this and offer the next working day — do NOT offer any time today.`,
+    };
+  }
+  if (dentistWasFree) {
+    return {
+      reason: "patient_busy",
+      note:
+        `The DENTIST is free, but every remaining ${durationMin}-minute slot overlaps an ` +
+        `appointment the PATIENT already has that day. Never say the dentist is booked or ` +
+        `fully booked. Say the patient's own day is too full, name the appointment that is ` +
+        `in the way, and offer another day or cancelling that appointment to make room.`,
     };
   }
   return {
@@ -118,12 +135,15 @@ export async function findAvailabilityForProfessional(
     professional.id,
     input.day,
   );
-  let slots = computeAvailableSlots({
+  // Kept separate from the patient filter below: "the dentist is booked" and "you
+  // are booked" are different sentences, and only this tells them apart.
+  const dentistSlots = computeAvailableSlots({
     day: input.day,
     durationMin: service.durationMinutes,
     existingBookings,
     now: input.now,
   });
+  let slots = dentistSlots;
 
   if (input.patientEmail) {
     const patientBookings = await repo.getBookingsForPatientOnDay(input.patientEmail, input.day);
@@ -138,6 +158,7 @@ export async function findAvailabilityForProfessional(
       day: input.day,
       durationMin: service.durationMinutes,
       now: input.now,
+      dentistWasFree: dentistSlots.length > 0,
     });
     return { service, professional, slots, noSlotsReason: reason, note };
   }

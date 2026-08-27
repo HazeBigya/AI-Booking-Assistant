@@ -356,6 +356,56 @@ describe("scheduler.findAvailabilityForProfessional", () => {
       expect(iso).toContain(at(MON, "10:00").toISOString()); // clear
     }
   });
+
+  // The exact shape of the bug: dentists free, patient's own day too full.
+  it("reports patient_busy, not fully_booked, when only the patient's own bookings clash", async () => {
+    const repo = makeRepo();
+    // Patient has a 60-min checkup 14:00-15:00, then asks for a 150-min filling today.
+    await createBooking(repo, {
+      serviceCode: "A",
+      professionalId: JUNIOR.id,
+      patientName: "Pat",
+      patientEmail: "pat@example.com",
+      start: at(MON, "14:00"),
+    });
+    const res = await findAvailabilityForProfessional(repo, {
+      serviceCode: "C",
+      professionalId: SENIOR.id, // untouched: every slot of theirs is free
+      day: at(MON, "00:00"),
+      patientEmail: "pat@example.com",
+      now: at(MON, "13:00"), // only 13:30/14:00/14:30 remain, and all overlap 14:00-15:00
+    });
+    expect("error" in res).toBe(false);
+    if (!("error" in res)) {
+      expect(res.slots).toHaveLength(0);
+      expect(res.noSlotsReason).toBe("patient_busy");
+      expect(res.note).toMatch(/DENTIST is free/);
+    }
+  });
+
+  it("still reports fully_booked when the dentist is the one with no room", async () => {
+    const repo = makeRepo();
+    // Someone else takes the senior 09:00-11:30, blocking every 150-min start.
+    for (const start of ["09:00", "11:30", "14:00"]) {
+      await createBooking(repo, {
+        serviceCode: "C",
+        professionalId: SENIOR.id,
+        patientName: "Other",
+        patientEmail: "other@example.com",
+        start: at(MON, start),
+      });
+    }
+    const res = await findAvailabilityForProfessional(repo, {
+      serviceCode: "C",
+      professionalId: SENIOR.id,
+      day: at(MON, "00:00"),
+      patientEmail: "pat@example.com",
+    });
+    if (!("error" in res)) {
+      expect(res.slots).toHaveLength(0);
+      expect(res.noSlotsReason).toBe("fully_booked");
+    }
+  });
 });
 
 describe("addMinutes", () => {

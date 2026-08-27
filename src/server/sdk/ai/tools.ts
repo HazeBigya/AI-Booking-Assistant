@@ -49,8 +49,10 @@ export const toolDefs: ToolDef[] = [
       "unavailable unless this returned an empty 'slots' list — if it returns slots, that " +
       "dentist IS available, so never substitute another. Slots are already filtered for you: " +
       "times that have passed, and times the logged-in patient is busy, are removed. If " +
-      "'slots' is empty, 'note' explains why (closed that day / too late in the day for an " +
-      "appointment that long / fully booked) — relay that reason.",
+      "'slots' is empty, 'noSlotsReason' says which of four different answers applies " +
+      "(closed / too_late_today / patient_busy / fully_booked) and 'note' tells you how to " +
+      "say it. Relay THAT reason: patient_busy means the DENTIST is free and the patient's " +
+      "own appointments are the clash, so never call the dentist booked in that case.",
     parameters: {
       type: "object",
       properties: {
