@@ -65,7 +65,7 @@ echo "  (first run downloads images + builds — this can take a few minutes)"
 echo
 
 # 4. Build + run the whole stack in the foreground so logs are visible.
-#    Ctrl-C stops it. Data persists between runs (see 'npm run reset' to wipe).
+#    Ctrl-C stops it. Data persists between runs (see 'npm run destroy' to wipe).
 docker compose up --build
 
 echo

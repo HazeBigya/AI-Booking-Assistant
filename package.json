@@ -8,7 +8,7 @@
     "start": "next start",
     "start:prod": "next build && next start",
     "start:all": "bash scripts/start.sh",
-    "reset": "docker compose down -v",
+    "destroy": "bash scripts/destroy.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",

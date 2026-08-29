@@ -23,8 +23,11 @@ npm run start:all         # starts Docker, Postgres, migrate+seed, and the app
 
 `start:all` launches Docker if needed, then `docker compose up` brings up
 Postgres, runs the one-shot `migrate` service (schema + seed), and starts the
-app at http://localhost:3000. Stop with `Ctrl+C`; wipe the database with
-`npm run reset`.
+app at http://localhost:3000. Stop with `Ctrl+C`.
+
+Two separate database commands, so the safe one can never be the destructive
+one: `npm run setup` builds and seeds and is safe to re-run; `npm run destroy`
+deletes the volume and asks for typed confirmation first.
 
 ### Local development (fast loop: app on host, DB in Docker)
 

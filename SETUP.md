@@ -140,9 +140,9 @@ You now have a working AI receptionist. Try: *"What services do you offer?"* or
 |--------------------------------|----------------------------------------------------|
 | Start the app                  | Double-click `start.command` (or `npm run start:all`) |
 | Stop the app                   | Click the Terminal window, press **Ctrl + C**      |
-| Start fresh (erase all data)   | `npm run reset` then start again                   |
+| Start fresh (erase all data)   | `npm run destroy` then `npm run setup`             |
 
-Your bookings are saved between restarts. `npm run reset` wipes the database back
+Your bookings are saved between restarts. `npm run destroy` wipes the database back
 to the clean seeded state (the 3 dentists + 5 services), which is handy before a
 demo.
 
