@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+import { PlaybackQueue } from "@client/voice/playback";
+
+const clip = (tag: string) => new Blob([tag], { type: "audio/mpeg" });
+const later = <T>(value: T, ms: number) => new Promise<T>((r) => setTimeout(() => r(value), ms));
+
+describe("PlaybackQueue", () => {
+  it("plays clips in index order even when they arrive out of order", async () => {
+    const played: string[] = [];
+    const q = new PlaybackQueue(async (c) => { played.push(await c.text()); });
+
+    // Sentence 2 is short and its TTS returns first. It must still wait.
+    q.enqueue(0, later(clip("one"), 40));
+    q.enqueue(1, later(clip("two"), 5));
+    q.enqueue(2, later(clip("three"), 20));
+
+    await q.whenDrained();
+    expect(played).toEqual(["one", "two", "three"]);
+  });
+
+  it("never overlaps two clips", async () => {
+    let playing = 0;
+    let overlapped = false;
+    const q = new PlaybackQueue(async () => {
+      playing++;
+      if (playing > 1) overlapped = true;
+      await later(null, 10);
+      playing--;
+    });
+
+    q.enqueue(0, Promise.resolve(clip("a")));
+    q.enqueue(1, Promise.resolve(clip("b")));
+    await q.whenDrained();
+    expect(overlapped).toBe(false);
+  });
+
+  // One failed sentence must not swallow the rest of the reply.
+  it("skips a clip that failed to generate and plays the rest", async () => {
+    const played: string[] = [];
+    const q = new PlaybackQueue(async (c) => { played.push(await c.text()); });
+
+    q.enqueue(0, Promise.resolve(clip("one")));
+    q.enqueue(1, Promise.reject(new Error("tts 502")));
+    q.enqueue(2, Promise.resolve(clip("three")));
+
+    await q.whenDrained();
+    expect(played).toEqual(["one", "three"]);
+  });
+
+  it("stops playing anything after stop()", async () => {
+    const played: string[] = [];
+    const q = new PlaybackQueue(async (c) => { played.push(await c.text()); });
+    q.enqueue(0, later(clip("one"), 20));
+    q.stop();
+    await q.whenDrained();
+    expect(played).toEqual([]);
+  });
+});

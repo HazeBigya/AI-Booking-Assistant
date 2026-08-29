@@ -11,6 +11,7 @@ export function Composer({
   onChange,
   onSend,
   onToggleVoice,
+  voiceDisabledReason,
   state,
   disabled,
 }: {
@@ -18,6 +19,9 @@ export function Composer({
   onChange: (v: string) => void;
   onSend: () => void;
   onToggleVoice: () => void;
+  // Non-null means the mic cannot work, and this says why — naming the missing
+  // env var rather than letting the patient press a button that fails.
+  voiceDisabledReason?: string | null;
   state: ConversationState;
   disabled: boolean;
 }) {
@@ -50,11 +54,14 @@ export function Composer({
       <button
         type="button"
         onClick={onToggleVoice}
+        disabled={Boolean(voiceDisabledReason)}
+        title={voiceDisabledReason ?? undefined}
         aria-pressed={listening}
-        aria-label={listening ? "Stop voice input" : "Start voice input"}
+        aria-label={voiceDisabledReason ?? (listening ? "Stop voice input" : "Start voice input")}
         className={
           "grid h-11 w-11 shrink-0 place-items-center rounded-full transition duration-300 ease-glide " +
-          "active:scale-[0.94] " +
+          "active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40 " +
+          "disabled:hover:bg-transparent disabled:active:scale-100 " +
           (listening
             ? "bg-accent-50 text-accent-700"
             : "text-ink-faint hover:bg-zinc-100 hover:text-ink-soft")

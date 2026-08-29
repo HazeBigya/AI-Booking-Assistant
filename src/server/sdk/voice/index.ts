@@ -1,0 +1,170 @@
+import { createDeepgramSTT, createDeepgramTTS } from "./deepgram";
+import { createElevenLabsTTS } from "./elevenlabs";
+import { createOpenAISTT, createOpenAITTS } from "./openai";
+import type { SpeechToText, TextToSpeech } from "./types";
+
+export type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
+
+interface VoiceVendor {
+  label: string;
+  keyEnv?: string; // absent = needs no key
+  modelEnv: string;
+  defaultModel: string;
+}
+
+// Two independent choices, because STT and TTS are separate products with
+// separate prices, and because the chat vendor (AI_PROVIDER) may sell neither.
+//
+// Model ids drift between releases, so every default has an env override and
+// nothing here is a hardcoded constant.
+export const STT_VENDORS: Record<string, VoiceVendor> = {
+  openai: {
+    label: "OpenAI Whisper",
+    keyEnv: "OPENAI_API_KEY",
+    modelEnv: "VOICE_STT_MODEL",
+    defaultModel: "whisper-1",
+  },
+  deepgram: {
+    label: "Deepgram",
+    keyEnv: "DEEPGRAM_API_KEY",
+    modelEnv: "VOICE_STT_MODEL",
+    defaultModel: "nova-3",
+  },
+  browser: {
+    label: "Browser Web Speech (free, Chrome only)",
+    modelEnv: "VOICE_STT_MODEL",
+    defaultModel: "",
+  },
+};
+
+// No `browser` row on purpose. The browser's speechSynthesis IS the mechanical
+// Google Translate voice the brief rejected; offering it as a fallback would
+// silently ship the exact thing that was refused. Poor STT costs accuracy,
+// which the booking confirmation already catches; poor TTS costs the product
+// its personality, which nothing catches.
+export const TTS_VENDORS: Record<string, VoiceVendor> = {
+  openai: {
+    label: "OpenAI",
+    keyEnv: "OPENAI_API_KEY",
+    modelEnv: "VOICE_TTS_MODEL",
+    defaultModel: "gpt-4o-mini-tts",
+  },
+  elevenlabs: {
+    label: "ElevenLabs",
+    keyEnv: "ELEVENLABS_API_KEY",
+    modelEnv: "VOICE_TTS_MODEL",
+    defaultModel: "eleven_flash_v2_5",
+  },
+  deepgram: {
+    label: "Deepgram Aura",
+    keyEnv: "DEEPGRAM_API_KEY",
+    modelEnv: "VOICE_TTS_MODEL",
+    defaultModel: "aura-2-thalia-en",
+  },
+};
+
+let sttCache: SpeechToText | undefined;
+let ttsCache: TextToSpeech | undefined;
+
+// Tests only: the cache would otherwise outlive an env change.
+export function resetVoiceCache(): void {
+  sttCache = undefined;
+  ttsCache = undefined;
+}
+
+export function getSpeechToText(): SpeechToText {
+  if (sttCache) return sttCache;
+  const name = env("VOICE_STT_PROVIDER") ?? "openai";
+  const vendor = pick(STT_VENDORS, name, "VOICE_STT_PROVIDER");
+
+  if (name === "browser") {
+    // The transcript arrives already transcribed from the client. This row
+    // exists so the route has one uniform shape to resolve against.
+    sttCache = {
+      name: "browser",
+      async transcribe() {
+        throw new Error("browser STT transcribes in the client, not on the server");
+      },
+    };
+  } else if (name === "deepgram") {
+    sttCache = createDeepgramSTT({ apiKey: key(vendor), model: model(vendor) });
+  } else {
+    sttCache = createOpenAISTT({ apiKey: key(vendor), model: model(vendor) });
+  }
+  return sttCache;
+}
+
+export function getTextToSpeech(): TextToSpeech {
+  if (ttsCache) return ttsCache;
+  const name = env("VOICE_TTS_PROVIDER") ?? "openai";
+  const vendor = pick(TTS_VENDORS, name, "VOICE_TTS_PROVIDER");
+
+  if (name === "elevenlabs") {
+    ttsCache = createElevenLabsTTS({
+      apiKey: key(vendor),
+      model: model(vendor),
+      voice: env("VOICE_TTS_VOICE"),
+    });
+  } else if (name === "deepgram") {
+    ttsCache = createDeepgramTTS({ apiKey: key(vendor), model: model(vendor) });
+  } else {
+    ttsCache = createOpenAITTS({
+      apiKey: key(vendor),
+      model: model(vendor),
+      voice: env("VOICE_TTS_VOICE"),
+    });
+  }
+  return ttsCache;
+}
+
+// The client needs to disable the mic with a reason, and a thrown error is a
+// bad way to say "not configured". This is the non-throwing view of the same.
+export function voiceStatus(): { stt: boolean; tts: boolean; reason?: string } {
+  let reason: string | undefined;
+  let stt = false;
+  let tts = false;
+  try {
+    getSpeechToText();
+    stt = true;
+  } catch (err) {
+    reason = message(err);
+  }
+  try {
+    getTextToSpeech();
+    tts = true;
+  } catch (err) {
+    reason ??= message(err);
+  }
+  return { stt, tts, reason };
+}
+
+function pick(table: Record<string, VoiceVendor>, name: string, envName: string): VoiceVendor {
+  const vendor = table[name];
+  if (!vendor) {
+    throw new Error(
+      `Unknown ${envName}="${name}". Valid values: ${Object.keys(table).join(", ")}. See .env.example.`,
+    );
+  }
+  return vendor;
+}
+
+function key(vendor: VoiceVendor): string {
+  if (!vendor.keyEnv) throw new Error(`${vendor.label} needs no API key`);
+  const value = env(vendor.keyEnv);
+  if (!value) throw new Error(`No ${vendor.label} key. Set ${vendor.keyEnv} in .env.`);
+  return value;
+}
+
+function model(vendor: VoiceVendor): string {
+  return env(vendor.modelEnv) ?? vendor.defaultModel;
+}
+
+// compose passes unset variables through as empty strings, which `??` accepts.
+function env(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

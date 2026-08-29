@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getChatHistory, resetChat, sendChat, type ChatTurn } from "@client/api/chat";
 import { getSession, logout, type SessionUser } from "@client/api/auth";
+import { useVoice } from "@client/voice/useVoice";
 import { Composer } from "./chat/Composer";
 import { MessageBubble } from "./chat/MessageBubble";
 import { MessageSkeleton } from "./chat/MessageSkeleton";
@@ -56,9 +57,9 @@ export function Chat() {
     setState("idle");
   }
 
-  async function send(text: string = input) {
+  async function send(text: string = input): Promise<string | null> {
     const body = text.trim();
-    if (!body || sending.current) return;
+    if (!body || sending.current) return null;
     sending.current = true;
 
     const next = [...messages, { role: "user", content: body } as ChatTurn];
@@ -70,19 +71,20 @@ export function Chat() {
       const { reply } = await sendChat(body); // the server holds the history
       setMessages([...next, { role: "assistant", content: reply }]);
       refreshSession(); // they may have just verified their email in-chat
+      return reply;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
+      return null;
     } finally {
       setState("idle");
       sending.current = false;
     }
   }
 
-  // Voice is presentation-only for now: this toggles the state the UI already
-  // renders, and is where the speech engine will attach.
-  function toggleVoice() {
-    setState((s) => (s === "listening" ? "idle" : "listening"));
-  }
+  // Voice is bookends around the unchanged text pipeline: a transcript goes in
+  // through the same send() a typed message uses, and the reply comes back out
+  // through TTS. Nothing in between knows which one happened.
+  const voice = useVoice({ setState, onTranscript: (text) => send(text) });
 
   return (
     <div className="flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row lg:overflow-hidden">
@@ -144,7 +146,8 @@ export function Chat() {
               value={input}
               onChange={setInput}
               onSend={() => send()}
-              onToggleVoice={toggleVoice}
+              onToggleVoice={voice.toggle}
+              voiceDisabledReason={voice.disabledReason}
               state={state}
               disabled={busy}
             />
