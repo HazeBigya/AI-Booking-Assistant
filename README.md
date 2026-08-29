@@ -43,6 +43,9 @@ npm run dev               # http://localhost:3000, hot reload
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `OPENROUTER_API_KEY` (+ matching `*_MODEL`) | one key per vendor — which is what lets several be configured at once for failover |
 | `CUSTOM_BASE_URL` / `CUSTOM_API_KEY` / `CUSTOM_MODEL` | with `AI_PROVIDER=custom`: any OpenAI-compatible endpoint (Qwen, Kimi, Groq, local Ollama/vLLM) |
 | `AWS_REGION` / `BEDROCK_MODEL_ID` | used for `bedrock` (creds via the AWS chain, native adapter) |
+| `VOICE_STT_PROVIDER` | who hears: `openai` (default), `deepgram`, `browser` (free, Chrome only, no key) |
+| `VOICE_TTS_PROVIDER` | who speaks: `openai` (default), `elevenlabs`, `deepgram`. No `browser` row on purpose — see Voice below |
+| `ELEVENLABS_API_KEY` / `DEEPGRAM_API_KEY` (+ `VOICE_STT_MODEL` / `VOICE_TTS_MODEL` / `VOICE_TTS_VOICE`) | one key per speech vendor; model ids are overridable because vendors rename them |
 | `CLINIC_TIMEZONE` | IANA name for the clinic's wall clock — sets opening hours and which slots exist |
 | `AUTH_SECRET` | signs the session JWT |
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | email transport for OTP codes + calendar invites (falls back to console) |
@@ -58,12 +61,14 @@ src/server/
   domain/booking/        PURE scheduling core — imports nothing external
   sdk/ai/                providers (LLM seam), tools + dispatch, loop, guardrails
   sdk/mailer/            email seam: console / SMTP / Resend, + .ics builder
+  sdk/voice/             speech seam: OpenAI / ElevenLabs / Deepgram, + recording store
   auth/                  email-OTP, JWT session, find-or-create patient
   db/                    drizzle schema, migrations, queries, seed
   shared/                rate limiting
 src/client/
   api/                   the only place that does HTTP (generic fetcher)
   components/            UI (never call fetch directly)
+  voice/                 mic capture, silence detection, sentence split, playback queue
 drizzle/                 generated migrations + custom double-booking guard
 ```
 
@@ -107,17 +112,68 @@ drizzle/                 generated migrations + custom double-booking guard
   with zod), never SQL; queries are parametrized via Drizzle. Money is stored as
   integer dollars.
 
+## Voice
+
+Three models in a chain, and only the middle one thinks:
+
+| Stage | Job | Model | Knows about dentists? |
+|---|---|---|---|
+| Ears | audio → text | STT (`whisper-1` by default) | no |
+| Brain | text → reply + tool calls | **the existing chat loop, unchanged** | yes |
+| Mouth | text → audio | TTS (`gpt-4o-mini-tts` by default) | no |
+
+The speech models never see a tool schema, never touch the database, and never
+decide anything. STT turns a recording into the same string the text box would
+have produced, so from that point a spoken booking is indistinguishable from a
+typed one — and is guarded by the same `tstzrange` exclusion constraint.
+**Voice adds no new correctness surface.**
+
+STT and TTS resolve independently of `AI_PROVIDER` and of each other, because
+they are separate products with separate prices and the chat vendor may sell
+neither. Bring your own key for whichever you want.
+
+**Why there is no browser-speech fallback.** The browser's built-in
+`speechSynthesis` is free and needs no key, and it is also the flat robotic
+voice people recognise from Google Translate. Falling back to it when a key is
+missing would silently ship the worst version of the feature while appearing to
+work, so a missing key disables the mic button with a message naming the
+variable to set instead. `browser` *is* offered for STT: nobody hears the ears,
+so cheap transcription costs accuracy that the booking confirmation already
+catches, while a cheap voice costs the product its personality and nothing
+catches that.
+
+**Latency.** Waiting for the full reply before speaking leaves 4-6 seconds of
+dead air, most of it the tool loop rather than the speech models. Instead the
+reply is stripped of markdown and split at sentence boundaries, and each
+sentence is spoken as it is produced:
+
+> "Kate's free from 11:30." ← plays now
+> "Want me to book it?"     ← generated during that playback
+
+Speaking one sentence takes longer than generating the next, so the queue stays
+fed and the perceived gap drops to roughly 1.5 seconds. An indexed FIFO queue
+keeps playback in order — a short sentence returns from TTS before a long
+earlier one, so without it the reply would play back scrambled.
+
+Recordings land in `storage/voice/` (gitignored) for debugging what the model
+misheard. Nothing reads them back in the request path; losing the directory
+loses nothing.
+
 ## Tests
 
 ```bash
-npm test        # 83 tests: pure booking core, clinic-timezone conversion,
+npm test        # 119 tests: pure booking core, clinic-timezone conversion,
                 # tool-dispatch guards, the fabricated-confirmation guard,
                 # provider config resolution, .ics builder, fallback chain,
-                # rate limiter, output validator
+                # rate limiter, output validator, and the voice layer
+                # (sentence splitting, provider resolution, recording store,
+                # silence detection, playback ordering)
 ```
 
 No database is required — DB-touching paths are covered by pure logic and the
-tool-layer guard branches that short-circuit before I/O.
+tool-layer guard branches that short-circuit before I/O. No API key is required
+either: every speech vendor sits behind an interface, so the voice tests cover
+resolution and sequencing without touching the network.
 
 ## Documented simplifications
 
@@ -136,5 +192,9 @@ tool-layer guard branches that short-circuit before I/O.
 - Choosing the *correct dentist* from free text is model-dependent (mitigated by
   the system prompt + a swappable stronger model); every other booking invariant
   is enforced deterministically.
-- Voice is a documented seam only: STT in front of / TTS behind the same
-  transport-agnostic chat service.
+- Voice is push-to-start with automatic endpointing: the turn ends itself after
+  ~800ms of silence. Full-duplex barge-in — interrupting the bot mid-sentence,
+  as the ElevenLabs demo does — needs bidirectional streaming and cancellation
+  threaded through the tool loop, and is not built.
+- Voice selection is one env var, not an in-app picker; recordings are written
+  to local disk behind a `VoiceStore` interface, and S3 is a swap, not a rewrite.

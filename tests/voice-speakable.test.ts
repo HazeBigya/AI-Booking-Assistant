@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitSentences, stripMarkdown, toSpeakable } from "@server/sdk/voice/speakable";
+import { splitSentences, stripMarkdown, toSpeakable } from "@client/voice/speakable";
 
 describe("stripMarkdown", () => {
   it("removes emphasis without eating the words", () => {
