@@ -25,8 +25,7 @@ export function createFallbackChain(providers: LLMProvider[]): LLMProvider {
       for (const provider of providers) {
         try {
           return await provider.classify(input, labels);
-        } catch {
-        }
+        } catch {}
       }
       return labels[0]; // gate fails open
     },

@@ -28,7 +28,10 @@ describe("buildIcs", () => {
     const kathmandu9am = {
       ...invite,
       start: zonedTimeToUtc({ year: 2026, month: 8, day: 27, hour: 9 }, "Asia/Kathmandu"),
-      end: zonedTimeToUtc({ year: 2026, month: 8, day: 27, hour: 11, minute: 30 }, "Asia/Kathmandu"),
+      end: zonedTimeToUtc(
+        { year: 2026, month: 8, day: 27, hour: 11, minute: 30 },
+        "Asia/Kathmandu",
+      ),
     };
     const ics = buildIcs(kathmandu9am);
     expect(ics).toContain("DTSTART:20260827T031500Z");

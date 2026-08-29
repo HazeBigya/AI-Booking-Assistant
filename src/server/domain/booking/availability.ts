@@ -21,13 +21,7 @@ export function computeAvailableSlots(params: {
   now?: Date;
   timeZone?: string;
 }): Date[] {
-  const {
-    day,
-    durationMin,
-    existingBookings,
-    now,
-    timeZone = CLINIC.timeZone,
-  } = params;
+  const { day, durationMin, existingBookings, now, timeZone = CLINIC.timeZone } = params;
 
   return enumerateSlotStarts(day, durationMin, timeZone).filter((start) => {
     if (now && start.getTime() <= now.getTime()) return false;

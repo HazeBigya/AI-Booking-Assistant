@@ -13,7 +13,14 @@ const FALLBACK_REPLY =
 // code's ten-minute window. Names are logged always because they are useful and
 // harmless; payloads only when explicitly asked for, and never unredacted.
 const LOG_TOOL_PAYLOADS = process.env.DEBUG_TOOL_PAYLOADS === "1";
-const SENSITIVE_KEYS = new Set(["code", "email", "patientemail", "patientname", "name", "attendees"]);
+const SENSITIVE_KEYS = new Set([
+  "code",
+  "email",
+  "patientemail",
+  "patientname",
+  "name",
+  "attendees",
+]);
 const MAX_PAYLOAD_CHARS = 1000;
 
 export function redactToolPayload(raw: string): string {

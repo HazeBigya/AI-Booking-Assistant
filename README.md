@@ -173,6 +173,15 @@ npm test        # 119 tests: pure booking core, clinic-timezone conversion,
                 # silence detection, playback ordering)
 ```
 
+```bash
+npm run lint         # eslint (next/core-web-vitals)
+npm run format:check # prettier, code only — markdown is excluded because it
+                     # pads table cells to the width of the widest one
+```
+
+Three blocks carry `// prettier-ignore` where column alignment is load-bearing
+and the formatter's output is strictly less readable.
+
 No database is required — DB-touching paths are covered by pure logic and the
 tool-layer guard branches that short-circuit before I/O. No API key is required
 either: every speech vendor sits behind an interface, so the voice tests cover

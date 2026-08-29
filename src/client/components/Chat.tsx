@@ -30,7 +30,10 @@ export function Chat() {
   const busy = state === "thinking";
   const untouched = messages.length === 1;
 
-  const refreshSession = () => getSession().then((r) => setMe(r.session)).catch(() => {});
+  const refreshSession = () =>
+    getSession()
+      .then((r) => setMe(r.session))
+      .catch(() => {});
 
   useEffect(() => {
     refreshSession();
@@ -107,7 +110,8 @@ export function Chat() {
                   Book with a dentist, in a sentence.
                 </h1>
                 <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-soft">
-                  Tell me what you need and when. I check the real schedule before I promise anything.
+                  Tell me what you need and when. I check the real schedule before I promise
+                  anything.
                 </p>
               </header>
             )}
@@ -152,7 +156,8 @@ export function Chat() {
               disabled={busy}
             />
             <p className="mt-2.5 px-1 text-xs text-ink-faint">
-              Availability and bookings are confirmed against the clinic's schedule, not guessed.
+              Availability and bookings are confirmed against the clinic&rsquo;s schedule, not
+              guessed.
             </p>
           </div>
         </div>

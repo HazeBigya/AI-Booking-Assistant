@@ -35,10 +35,7 @@ export async function findAvailability(
 
   const options: AvailabilityOption[] = [];
   for (const professional of professionals) {
-    const existingBookings = await repo.getBookingsForProfessionalOnDay(
-      professional.id,
-      input.day,
-    );
+    const existingBookings = await repo.getBookingsForProfessionalOnDay(professional.id, input.day);
     const slots = computeAvailableSlots({
       day: input.day,
       durationMin: service.durationMinutes,
@@ -53,11 +50,7 @@ export async function findAvailability(
 
 // Each of these is a different answer to the patient, and getting them mixed up
 // makes the bot blame the dentist for the patient's own clash.
-export type NoSlotsReason =
-  | "closed"
-  | "too_late_today"
-  | "patient_busy"
-  | "fully_booked";
+export type NoSlotsReason = "closed" | "too_late_today" | "patient_busy" | "fully_booked";
 
 function explainNoSlots(params: {
   day: Date;
@@ -131,10 +124,7 @@ export async function findAvailabilityForProfessional(
     return { error: "That professional cannot perform the requested service." };
   }
 
-  const existingBookings = await repo.getBookingsForProfessionalOnDay(
-    professional.id,
-    input.day,
-  );
+  const existingBookings = await repo.getBookingsForProfessionalOnDay(professional.id, input.day);
   // Kept separate from the patient filter below: "the dentist is booked" and "you
   // are booked" are different sentences, and only this tells them apart.
   const dentistSlots = computeAvailableSlots({
@@ -172,12 +162,7 @@ export type BookingResult =
   | { ok: false; reason: BookingRejectionReason; message: string };
 
 export type BookingRejectionReason =
-  | "unknown_service"
-  | "in_past"
-  | "outside_hours"
-  | "not_qualified"
-  | "slot_taken"
-  | "patient_busy";
+  "unknown_service" | "in_past" | "outside_hours" | "not_qualified" | "slot_taken" | "patient_busy";
 
 export async function createBooking(
   repo: BookingRepository,
@@ -229,10 +214,7 @@ export async function createBooking(
   }
 
   // App-level overlap check: friendly message before hitting the DB.
-  const existingBookings = await repo.getBookingsForProfessionalOnDay(
-    professional.id,
-    input.start,
-  );
+  const existingBookings = await repo.getBookingsForProfessionalOnDay(professional.id, input.start);
   const candidate: Interval = { start: input.start, end };
   if (existingBookings.some((b) => overlaps(candidate, b))) {
     return {

@@ -92,7 +92,10 @@ interface GeminiFunctionCall {
   args?: Record<string, unknown>;
 }
 
-function fromGemini(text: string | undefined, calls: GeminiFunctionCall[] | undefined): ChatMessage {
+function fromGemini(
+  text: string | undefined,
+  calls: GeminiFunctionCall[] | undefined,
+): ChatMessage {
   const toolCalls = (calls ?? []).map((c, i) => ({
     id: `${c.name ?? "call"}-${i}`,
     name: c.name ?? "",

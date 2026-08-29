@@ -18,9 +18,7 @@ export function buildIcs(invite: CalendarInvite): string {
     `SUMMARY:${escapeText(invite.summary)}`,
     `DESCRIPTION:${escapeText(invite.description)}`,
     `ORGANIZER;CN=${escapeText(invite.organizer.name)}:mailto:${invite.organizer.email}`,
-    ...invite.attendees.map(
-      (a) => `ATTENDEE;CN=${escapeText(a.name)};RSVP=TRUE:mailto:${a.email}`,
-    ),
+    ...invite.attendees.map((a) => `ATTENDEE;CN=${escapeText(a.name)};RSVP=TRUE:mailto:${a.email}`),
     "LOCATION:Bright Smile Clinic",
     `STATUS:${isCancel ? "CANCELLED" : "CONFIRMED"}`,
     "END:VEVENT",
@@ -33,7 +31,10 @@ export function buildIcs(invite: CalendarInvite): string {
 // calendar render them in the viewer's zone. Floating time would be read as the
 // viewer's own wall clock and shift the appointment.
 function toIcsUtc(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 function escapeText(value: string): string {

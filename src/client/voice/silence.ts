@@ -5,6 +5,7 @@
 // sensitive cuts people off mid-sentence, too dull adds dead air — and tuning
 // against a test is far cheaper than tuning against a microphone.
 
+// prettier-ignore
 export interface SilenceOptions {
   threshold?: number;   // RMS level counted as speech (0..1)
   silenceMs?: number;   // quiet needed after speech to end the turn

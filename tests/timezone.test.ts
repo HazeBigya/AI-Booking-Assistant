@@ -6,7 +6,11 @@ import {
   zonedDateKey,
   zonedTimeToUtc,
 } from "../src/server/domain/booking/timezone";
-import { enumerateSlotStarts, isWithinClinicHours, isWorkingDay } from "../src/server/domain/booking/rules";
+import {
+  enumerateSlotStarts,
+  isWithinClinicHours,
+  isWorkingDay,
+} from "../src/server/domain/booking/rules";
 import { computeAvailableSlots } from "../src/server/domain/booking/availability";
 import { parseTimeZone } from "../src/server/controllers/chat-controller";
 
@@ -23,7 +27,10 @@ describe("zoned wall-clock conversion", () => {
   });
 
   it("round-trips: the instant reads back as the wall-clock time asked for", () => {
-    const instant = zonedTimeToUtc({ year: 2026, month: 8, day: 26, hour: 16, minute: 30 }, KATHMANDU);
+    const instant = zonedTimeToUtc(
+      { year: 2026, month: 8, day: 26, hour: 16, minute: 30 },
+      KATHMANDU,
+    );
     const parts = partsInZone(instant, KATHMANDU);
     expect([parts.hour, parts.minute]).toEqual([16, 30]);
   });
@@ -64,7 +71,13 @@ describe("clinic rules in a non-UTC zone", () => {
     expect(isWithinClinicHours(nineLocal, tenLocal, KATHMANDU)).toBe(true);
     // 09:00 UTC is 14:45 local — still open; 03:15 UTC is 09:00 local, but under a
     // UTC reading it would look like the middle of the night.
-    expect(isWithinClinicHours(new Date("2026-08-26T03:15:00Z"), new Date("2026-08-26T04:15:00Z"), KATHMANDU)).toBe(true);
+    expect(
+      isWithinClinicHours(
+        new Date("2026-08-26T03:15:00Z"),
+        new Date("2026-08-26T04:15:00Z"),
+        KATHMANDU,
+      ),
+    ).toBe(true);
     const saturday = zonedTimeToUtc({ year: 2026, month: 8, day: 29, hour: 12 }, KATHMANDU);
     expect(isWorkingDay(saturday, KATHMANDU)).toBe(false);
   });
@@ -75,7 +88,13 @@ describe("slots already in progress are not offered", () => {
 
   it("drops every start at or before now, and keeps the rest", () => {
     const now = new Date("2026-08-26T13:03:00Z"); // 1:03 PM
-    const slots = computeAvailableSlots({ day, durationMin: 60, existingBookings: [], now, timeZone: "UTC" });
+    const slots = computeAvailableSlots({
+      day,
+      durationMin: 60,
+      existingBookings: [],
+      now,
+      timeZone: "UTC",
+    });
     const labels = slots.map((s) => formatZonedTime(s, "UTC"));
     expect(labels).not.toContain("1:00 PM");
     expect(labels[0]).toBe("1:30 PM");
@@ -85,13 +104,25 @@ describe("slots already in progress are not offered", () => {
   it("leaves nothing for a long service once its last start has gone", () => {
     // Service E is 360 minutes: the last start that fits before 17:00 is 11:00.
     const now = new Date("2026-08-26T13:03:00Z");
-    const slots = computeAvailableSlots({ day, durationMin: 360, existingBookings: [], now, timeZone: "UTC" });
+    const slots = computeAvailableSlots({
+      day,
+      durationMin: 360,
+      existingBookings: [],
+      now,
+      timeZone: "UTC",
+    });
     expect(slots).toEqual([]);
   });
 
   it("still offers the whole day when now is before opening", () => {
     const now = new Date("2026-08-26T06:00:00Z");
-    const slots = computeAvailableSlots({ day, durationMin: 60, existingBookings: [], now, timeZone: "UTC" });
+    const slots = computeAvailableSlots({
+      day,
+      durationMin: 60,
+      existingBookings: [],
+      now,
+      timeZone: "UTC",
+    });
     expect(slots).toHaveLength(15);
   });
 });
