@@ -35,7 +35,9 @@ export const toolDefs: ToolDef[] = [
       "List the dentists who can perform a service, with their expertise and price for it.",
     parameters: {
       type: "object",
-      properties: { serviceName: { type: "string", description: "The service name, e.g. 'Root Canal'." } },
+      properties: {
+        serviceName: { type: "string", description: "The service name, e.g. 'Root Canal'." },
+      },
       required: ["serviceName"],
     },
   },
@@ -114,8 +116,14 @@ export const toolDefs: ToolDef[] = [
     parameters: {
       type: "object",
       properties: {
-        serviceName: { type: "string", description: "The service name, e.g. 'Root Canal' or 'Teeth Whitening'." },
-        dentistName: { type: "string", description: "The dentist's name exactly as the patient requested, e.g. 'John'." },
+        serviceName: {
+          type: "string",
+          description: "The service name, e.g. 'Root Canal' or 'Teeth Whitening'.",
+        },
+        dentistName: {
+          type: "string",
+          description: "The dentist's name exactly as the patient requested, e.g. 'John'.",
+        },
         start: { type: "string", description: "Start, ISO 8601 (e.g. 2026-08-26T09:00:00Z)." },
         patientName: { type: "string", description: "The patient's full name." },
       },
@@ -133,7 +141,10 @@ export const toolDefs: ToolDef[] = [
     parameters: {
       type: "object",
       properties: {
-        bookingId: { type: "integer", description: "The appointment's id, from get_my_appointments." },
+        bookingId: {
+          type: "integer",
+          description: "The appointment's id, from get_my_appointments.",
+        },
       },
       required: ["bookingId"],
     },
@@ -246,7 +257,7 @@ export async function runTool(
             "These are the PATIENT's own appointments that day, and the times they cover " +
             "were removed from 'slots'. If the patient asks for one of those times, the " +
             "clash is THEIRS, not the dentist's: say \"you already have a <service> with " +
-            "<dentist> at <time>\" — never say the dentist is unavailable. Only call the " +
+            '<dentist> at <time>" — never say the dentist is unavailable. Only call the ' +
             "dentist booked when a missing time does not overlap any appointment listed here.";
         }
       }
@@ -264,7 +275,12 @@ export async function runTool(
       }
       const parsed = schemas.request_login_code.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
-      if (!rateLimit(`otp-req:${parsed.data.email}`, { max: OTP_REQUEST_MAX, windowMs: OTP_WINDOW_MS }).allowed) {
+      if (
+        !rateLimit(`otp-req:${parsed.data.email}`, {
+          max: OTP_REQUEST_MAX,
+          windowMs: OTP_WINDOW_MS,
+        }).allowed
+      ) {
         return errorResult("Too many code requests for that email. Please wait a few minutes.");
       }
       const code = await createOtp(parsed.data.email);
@@ -277,7 +293,10 @@ export async function runTool(
             "the address, or try again in a moment.",
         );
       }
-      return JSON.stringify({ ok: true, message: `A 6-digit code was sent to ${parsed.data.email}.` });
+      return JSON.stringify({
+        ok: true,
+        message: `A 6-digit code was sent to ${parsed.data.email}.`,
+      });
     }
 
     case "verify_login_code": {
@@ -290,8 +309,16 @@ export async function runTool(
       }
       const parsed = schemas.verify_login_code.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
-      if (!rateLimit(`otp-verify:${parsed.data.email}`, { max: OTP_VERIFY_MAX, windowMs: OTP_WINDOW_MS }).allowed) {
-        return JSON.stringify({ ok: false, message: "Too many attempts. Please request a new code and wait a few minutes." });
+      if (
+        !rateLimit(`otp-verify:${parsed.data.email}`, {
+          max: OTP_VERIFY_MAX,
+          windowMs: OTP_WINDOW_MS,
+        }).allowed
+      ) {
+        return JSON.stringify({
+          ok: false,
+          message: "Too many attempts. Please request a new code and wait a few minutes.",
+        });
       }
       if (!(await verifyOtp(parsed.data.email, parsed.data.code))) {
         return JSON.stringify({ ok: false, message: "That code is invalid or expired." });
@@ -314,12 +341,15 @@ export async function runTool(
     case "create_booking": {
       // Email comes from the session: a patient can only book under their own address.
       if (!ctx.authedEmail) {
-        return errorResult("The patient must verify their email (request + verify a code) before booking.");
+        return errorResult(
+          "The patient must verify their email (request + verify a code) before booking.",
+        );
       }
       const parsed = schemas.create_booking.safeParse(args);
       if (!parsed.success) return errorResult(zodMessage(parsed.error));
       const start = new Date(parsed.data.start);
-      if (Number.isNaN(start.getTime())) return errorResult(`Invalid start "${parsed.data.start}".`);
+      if (Number.isNaN(start.getTime()))
+        return errorResult(`Invalid start "${parsed.data.start}".`);
       const now = new Date();
       if (start.getTime() <= now.getTime()) {
         return errorResult(
@@ -439,7 +469,9 @@ async function resolveService(
   const catalog = await getServiceCatalog();
   const service = matchByName(catalog, serviceName, (s) => s.name);
   if (!service) {
-    return { error: `Unknown service "${serviceName}". Available: ${catalog.map((s) => s.name).join(", ")}.` };
+    return {
+      error: `Unknown service "${serviceName}". Available: ${catalog.map((s) => s.name).join(", ")}.`,
+    };
   }
   return { service };
 }
@@ -454,7 +486,9 @@ async function resolveDentist(
   const dentist = providers && matchByName(providers, dentistName, (p) => p.name);
   if (!dentist) {
     const names = (providers ?? []).map((p) => p.name).join(", ");
-    return { error: `${dentistName} does not offer ${serviceName}. Dentists for ${serviceName}: ${names || "none"}.` };
+    return {
+      error: `${dentistName} does not offer ${serviceName}. Dentists for ${serviceName}: ${names || "none"}.`,
+    };
   }
   return { dentist };
 }
@@ -522,5 +556,7 @@ function errorResult(message: string): string {
 }
 
 function zodMessage(error: z.ZodError): string {
-  return "Invalid arguments: " + error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ");
+  return (
+    "Invalid arguments: " + error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")
+  );
 }

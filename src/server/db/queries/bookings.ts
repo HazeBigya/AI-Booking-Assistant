@@ -147,17 +147,27 @@ export async function insertBooking(b: NewBooking): Promise<Booking> {
 
 // Nullable-safe: without a patient row the email snapshot still records who booked.
 async function resolvePatientId(email: string): Promise<number | undefined> {
-  const rows = await db.select({ id: patients.id }).from(patients).where(eq(patients.email, email)).limit(1);
+  const rows = await db
+    .select({ id: patients.id })
+    .from(patients)
+    .where(eq(patients.email, email))
+    .limit(1);
   return rows[0]?.id;
 }
 
-async function resolvePrice(professionalId: number, serviceId: number): Promise<number | undefined> {
+async function resolvePrice(
+  professionalId: number,
+  serviceId: number,
+): Promise<number | undefined> {
   const rows = await db
     .select({ override: professionalServices.priceOverride, base: services.basePrice })
     .from(services)
     .leftJoin(
       professionalServices,
-      and(eq(professionalServices.serviceId, services.id), eq(professionalServices.professionalId, professionalId)),
+      and(
+        eq(professionalServices.serviceId, services.id),
+        eq(professionalServices.professionalId, professionalId),
+      ),
     )
     .where(eq(services.id, serviceId))
     .limit(1);
@@ -169,9 +179,7 @@ async function resolvePrice(professionalId: number, serviceId: number): Promise<
 // Drizzle may wrap the pg error, so check the error and its cause.
 function isExclusionViolation(err: unknown): boolean {
   const codeOf = (e: unknown): string | undefined =>
-    typeof e === "object" && e !== null && "code" in e
-      ? (e as { code?: string }).code
-      : undefined;
+    typeof e === "object" && e !== null && "code" in e ? (e as { code?: string }).code : undefined;
   return (
     codeOf(err) === EXCLUSION_VIOLATION ||
     codeOf((err as { cause?: unknown } | null)?.cause) === EXCLUSION_VIOLATION

@@ -7,7 +7,9 @@ const later = <T>(value: T, ms: number) => new Promise<T>((r) => setTimeout(() =
 describe("PlaybackQueue", () => {
   it("plays clips in index order even when they arrive out of order", async () => {
     const played: string[] = [];
-    const q = new PlaybackQueue(async (c) => { played.push(await c.text()); });
+    const q = new PlaybackQueue(async (c) => {
+      played.push(await c.text());
+    });
 
     // Sentence 2 is short and its TTS returns first. It must still wait.
     q.enqueue(0, later(clip("one"), 40));
@@ -37,7 +39,9 @@ describe("PlaybackQueue", () => {
   // One failed sentence must not swallow the rest of the reply.
   it("skips a clip that failed to generate and plays the rest", async () => {
     const played: string[] = [];
-    const q = new PlaybackQueue(async (c) => { played.push(await c.text()); });
+    const q = new PlaybackQueue(async (c) => {
+      played.push(await c.text());
+    });
 
     q.enqueue(0, Promise.resolve(clip("one")));
     q.enqueue(1, Promise.reject(new Error("tts 502")));
@@ -49,7 +53,9 @@ describe("PlaybackQueue", () => {
 
   it("stops playing anything after stop()", async () => {
     const played: string[] = [];
-    const q = new PlaybackQueue(async (c) => { played.push(await c.text()); });
+    const q = new PlaybackQueue(async (c) => {
+      played.push(await c.text());
+    });
     q.enqueue(0, later(clip("one"), 20));
     q.stop();
     await q.whenDrained();

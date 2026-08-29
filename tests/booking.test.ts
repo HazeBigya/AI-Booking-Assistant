@@ -173,10 +173,15 @@ class FakeRepo implements BookingRepository {
   async listProfessionalsForService(serviceId: number) {
     return this.capable.get(serviceId) ?? [];
   }
-  async getBookingsForProfessionalOnDay(professionalId: number, day: Date): Promise<PortInterval[]> {
+  async getBookingsForProfessionalOnDay(
+    professionalId: number,
+    day: Date,
+  ): Promise<PortInterval[]> {
     const ymd = day.toISOString().slice(0, 10);
     return this.bookings
-      .filter((b) => b.professionalId === professionalId && b.start.toISOString().slice(0, 10) === ymd)
+      .filter(
+        (b) => b.professionalId === professionalId && b.start.toISOString().slice(0, 10) === ymd,
+      )
       .map((b) => ({ start: b.start, end: b.end }));
   }
   async getBookingsForPatientOnDay(patientEmail: string, day: Date): Promise<PortInterval[]> {

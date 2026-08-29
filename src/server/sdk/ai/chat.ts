@@ -7,6 +7,44 @@ const MAX_CORRECTIONS = 1;
 const FALLBACK_REPLY =
   "Sorry, I'm having trouble completing that right now. Please try again, or rephrase your request.";
 
+// Tool payloads carry the patient's login code, email and name. otp.ts hashes
+// the code at rest and never stores it in plaintext, so printing it here would
+// defeat that control: a log reader could sign in as the patient inside the
+// code's ten-minute window. Names are logged always because they are useful and
+// harmless; payloads only when explicitly asked for, and never unredacted.
+const LOG_TOOL_PAYLOADS = process.env.DEBUG_TOOL_PAYLOADS === "1";
+const SENSITIVE_KEYS = new Set([
+  "code",
+  "email",
+  "patientemail",
+  "patientname",
+  "name",
+  "attendees",
+]);
+const MAX_PAYLOAD_CHARS = 1000;
+
+export function redactToolPayload(raw: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Tool results are not always JSON, and a logger must never throw.
+    return raw.length > MAX_PAYLOAD_CHARS ? `${raw.slice(0, MAX_PAYLOAD_CHARS)}…` : raw;
+  }
+  const out = JSON.stringify(scrub(parsed));
+  return out.length > MAX_PAYLOAD_CHARS ? `${out.slice(0, MAX_PAYLOAD_CHARS)}…` : out;
+}
+
+function scrub(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(scrub);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([k, v]) =>
+      SENSITIVE_KEYS.has(k.toLowerCase()) ? [k, "[redacted]"] : [k, scrub(v)],
+    ),
+  );
+}
+
 export interface ChatResult {
   reply: string;
   messages: ChatMessage[]; // full history incl. assistant + tool messages, to persist
@@ -43,9 +81,12 @@ export async function runChat(history: ChatMessage[], ctx: ToolContext = {}): Pr
     }
 
     for (const call of message.toolCalls) {
-      console.log(`[tool] call ${call.name} args=${call.arguments}`);
+      console.log(`[tool] call ${call.name}`);
       const result = await runTool(call.name, call.arguments, ctx);
-      console.log(`[tool] result ${call.name} -> ${result.slice(0, 400)}`);
+      if (LOG_TOOL_PAYLOADS) {
+        console.log(`[tool]   args   ${redactToolPayload(call.arguments)}`);
+        console.log(`[tool]   result ${redactToolPayload(result)}`);
+      }
       messages.push({ role: "tool", content: result, toolCallId: call.id, name: call.name });
     }
   }

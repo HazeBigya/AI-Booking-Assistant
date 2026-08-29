@@ -70,7 +70,13 @@ export function Composer({
         {listening ? (
           <VoiceOrb state="listening" />
         ) : (
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.5} className="h-5 w-5" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            strokeWidth={1.5}
+            className="h-5 w-5"
+            aria-hidden="true"
+          >
             <path
               d="M12 4.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-5 0V7A2.5 2.5 0 0 1 12 4.5ZM6 11v1a6 6 0 0 0 12 0v-1M12 18.5V21"
               stroke="currentColor"
@@ -107,8 +113,19 @@ export function Composer({
           transition duration-300 ease-glide hover:-translate-y-px active:translate-y-0 active:scale-[0.94]
           disabled:pointer-events-none disabled:bg-zinc-200 disabled:text-zinc-400"
       >
-        <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.5} className="h-5 w-5" aria-hidden="true">
-          <path d="M5 12h13M13 6.5 18.5 12 13 17.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          strokeWidth={1.5}
+          className="h-5 w-5"
+          aria-hidden="true"
+        >
+          <path
+            d="M5 12h13M13 6.5 18.5 12 13 17.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
     </div>

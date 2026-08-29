@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getSpeechToText, getTextToSpeech, resetVoiceCache, voiceStatus } from "@server/sdk/voice";
 
 const TOUCHED = [
-  "VOICE_STT_PROVIDER", "VOICE_TTS_PROVIDER",
-  "OPENAI_API_KEY", "ELEVENLABS_API_KEY", "DEEPGRAM_API_KEY",
+  "VOICE_STT_PROVIDER",
+  "VOICE_TTS_PROVIDER",
+  "OPENAI_API_KEY",
+  "ELEVENLABS_API_KEY",
+  "DEEPGRAM_API_KEY",
 ];
 
 let saved: Record<string, string | undefined> = {};

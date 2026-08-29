@@ -23,8 +23,11 @@ npm run start:all         # starts Docker, Postgres, migrate+seed, and the app
 
 `start:all` launches Docker if needed, then `docker compose up` brings up
 Postgres, runs the one-shot `migrate` service (schema + seed), and starts the
-app at http://localhost:3000. Stop with `Ctrl+C`; wipe the database with
-`npm run reset`.
+app at http://localhost:3000. Stop with `Ctrl+C`.
+
+Two separate database commands, so the safe one can never be the destructive
+one: `npm run setup` builds and seeds and is safe to re-run; `npm run destroy`
+deletes the volume and asks for typed confirmation first.
 
 ### Local development (fast loop: app on host, DB in Docker)
 
@@ -169,6 +172,15 @@ npm test        # 119 tests: pure booking core, clinic-timezone conversion,
                 # (sentence splitting, provider resolution, recording store,
                 # silence detection, playback ordering)
 ```
+
+```bash
+npm run lint         # eslint (next/core-web-vitals)
+npm run format:check # prettier, code only — markdown is excluded because it
+                     # pads table cells to the width of the widest one
+```
+
+Three blocks carry `// prettier-ignore` where column alignment is load-bearing
+and the formatter's output is strictly less readable.
 
 No database is required — DB-touching paths are covered by pure logic and the
 tool-layer guard branches that short-circuit before I/O. No API key is required

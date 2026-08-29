@@ -4,11 +4,13 @@
 
 // Periods that end a word here are not sentence boundaries. Lowercased, and
 // stored without the trailing dot so multi-dot forms like "a.m" match too.
+// prettier-ignore
 const ABBREVIATIONS = new Set([
   "dr", "mr", "mrs", "ms", "prof", "st", "approx", "no", "vs", "etc",
   "e.g", "i.e", "a.m", "p.m",
 ]);
 
+// prettier-ignore
 export function stripMarkdown(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, " ")          // fenced code: unspeakable

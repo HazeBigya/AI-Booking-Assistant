@@ -1,11 +1,5 @@
 import OpenAI from "openai";
-import type {
-  ChatMessage,
-  ChatRequest,
-  ChatResponse,
-  LLMProvider,
-  ToolDef,
-} from "./types";
+import type { ChatMessage, ChatRequest, ChatResponse, LLMProvider, ToolDef } from "./types";
 
 type WireMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 type WireTool = OpenAI.Chat.Completions.ChatCompletionTool;

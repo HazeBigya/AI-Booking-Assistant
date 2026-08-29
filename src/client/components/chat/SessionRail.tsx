@@ -93,7 +93,13 @@ function AccountSection({
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-zinc-200
             bg-white text-ink-faint transition-colors duration-300 ease-glide group-hover:text-ink"
         >
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.5} className="h-4 w-4" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            strokeWidth={1.5}
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
             <path d="M12 6v12M6 12h12" stroke="currentColor" strokeLinecap="round" />
           </svg>
         </span>
@@ -122,7 +128,13 @@ function AccountSection({
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink-faint
               transition duration-300 ease-glide hover:bg-zinc-100 hover:text-ink active:scale-[0.94]"
           >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.5} className="h-[18px] w-[18px]" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              strokeWidth={1.5}
+              className="h-[18px] w-[18px]"
+              aria-hidden="true"
+            >
               <path
                 d="M15 5.5V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-.5M11 12h9m0 0-3-3m3 3-3 3"
                 stroke="currentColor"

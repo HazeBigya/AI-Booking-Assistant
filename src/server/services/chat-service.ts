@@ -3,14 +3,14 @@ import { runChat } from "@server/sdk/ai/chat";
 import { validateOutput } from "@server/sdk/ai/guardrails";
 import { SYSTEM_PROMPT } from "@server/sdk/ai/prompt";
 import type { ToolContext } from "@server/sdk/ai/tools";
-import { getRecentChatMessages, linkPatientToSession, saveChatMessage } from "@server/db/queries/chat";
+import {
+  getRecentChatMessages,
+  linkPatientToSession,
+  saveChatMessage,
+} from "@server/db/queries/chat";
 import { findOrCreatePatient } from "@server/auth/patients";
 import { CLINIC } from "@server/domain/booking/rules";
-import {
-  formatZonedDate,
-  formatZonedTime,
-  zonedDateKey,
-} from "@server/domain/booking/timezone";
+import { formatZonedDate, formatZonedTime, zonedDateKey } from "@server/domain/booking/timezone";
 
 const CONTEXT_WINDOW = 15; // recent messages sent to the model
 
@@ -57,7 +57,8 @@ export async function handleChat(
     totalTokens = result.totalTokens;
   } catch (err) {
     console.error("all LLM providers failed:", err);
-    reply = "I'm sorry — I can't reach our booking assistant right now. Please try again in a moment.";
+    reply =
+      "I'm sorry — I can't reach our booking assistant right now. Please try again in a moment.";
   }
 
   await saveChatMessage(sessionId, "user", userMessage);
