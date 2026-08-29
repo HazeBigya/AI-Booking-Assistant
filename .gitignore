@@ -31,3 +31,6 @@ yarn-error.log*
 .idea
 *.swp
 dev.log
+
+# Voice recordings: debug artifacts, never a source of truth
+/storage
