@@ -1,8 +1,10 @@
 import { extensionFor } from "./mime";
+import { ELEVENLABS_VOICE_SETTINGS } from "./persona";
 import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
 
-// 'Rachel' — ElevenLabs' stock voice, present on every account, so the connector
-// works before anyone has picked a voice.
+// 'Rachel' — a warm female stock voice present on every account, so the
+// connector matches the receptionist in persona.ts before anyone has browsed
+// the voice library. Override with VOICE_TTS_VOICE (a voice id, not a name).
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 
 export interface ElevenLabsConfig {
@@ -20,7 +22,11 @@ export function createElevenLabsTTS(cfg: ElevenLabsConfig): TextToSpeech {
       const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: "POST",
         headers: { "xi-api-key": cfg.apiKey, "content-type": "application/json" },
-        body: JSON.stringify({ text, model_id: cfg.model }),
+        body: JSON.stringify({
+          text,
+          model_id: cfg.model,
+          voice_settings: ELEVENLABS_VOICE_SETTINGS,
+        }),
       });
       if (!res.ok) {
         throw new Error(`ElevenLabs TTS failed (${res.status}): ${await res.text()}`);

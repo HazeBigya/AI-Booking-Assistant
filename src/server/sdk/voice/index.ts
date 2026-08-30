@@ -68,6 +68,8 @@ export const TTS_VENDORS: Record<string, VoiceVendor> = {
     label: "Deepgram Aura",
     keyEnv: "DEEPGRAM_API_KEY",
     modelEnv: "VOICE_TTS_MODEL",
+    // Thalia: female and warm, to match the receptionist the other two vendors
+    // are configured for. Deepgram names the voice inside the model id.
     defaultModel: "aura-2-thalia-en",
   },
 };

@@ -32,22 +32,27 @@ export function MessageBubble({
         {mine ? (
           <span className="whitespace-pre-wrap">{turn.content}</span>
         ) : (
-          <div
-            className="prose prose-sm max-w-none overflow-x-auto text-ink
-              prose-p:my-1.5 prose-headings:font-medium prose-headings:tracking-tight
-              prose-strong:text-ink prose-table:my-3 prose-table:text-sm
-              prose-th:font-medium prose-th:text-ink-soft prose-td:py-1.5
-              prose-li:my-0.5 prose-a:text-accent-700"
-          >
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.content}</ReactMarkdown>
+          <>
+            <div
+              className="prose prose-sm max-w-none overflow-x-auto text-ink
+                prose-p:my-1.5 prose-headings:font-medium prose-headings:tracking-tight
+                prose-strong:text-ink prose-table:my-3 prose-table:text-sm
+                prose-th:font-medium prose-th:text-ink-soft prose-td:py-1.5
+                prose-li:my-0.5 prose-a:text-accent-700"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.content}</ReactMarkdown>
+            </div>
+            {/* Outside the prose wrapper: this is a control, and the typography
+                plugin styles anything inside as if it were prose. */}
             {onSpeak && (
               <button
                 type="button"
                 onClick={onSpeak}
                 aria-label="Read this reply aloud"
                 title="Read aloud"
-                className="mt-2 -ml-1 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs
-                  text-ink-faint transition hover:bg-zinc-100 hover:text-ink-soft
+                className="mt-2.5 -ml-1.5 flex items-center gap-1.5 rounded-lg border
+                  border-zinc-200/80 px-2.5 py-1 text-xs font-medium text-ink-soft
+                  transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-ink
                   focus-visible:outline-2 focus-visible:outline-offset-2
                   focus-visible:outline-accent-600"
               >
@@ -55,7 +60,7 @@ export function MessageBubble({
                 Listen
               </button>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
