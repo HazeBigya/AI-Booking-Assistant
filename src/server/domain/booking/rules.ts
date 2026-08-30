@@ -79,6 +79,22 @@ export function enumerateSlotStarts(
   return starts;
 }
 
+// Is this instant one of the starts the clinic actually offers?
+//
+// Clinic hours alone are not enough. 14:45 is inside 09:00-17:00 and was
+// therefore accepted, even though nothing on the grid ever offered it — which
+// is how a request for 9am became a booking at 2:45pm: the time was never
+// checked against the times that exist, only against the day's opening and
+// closing. Anything not enumerable here was invented somewhere upstream.
+export function isSlotStart(
+  start: Date,
+  durationMin: number,
+  timeZone: string = CLINIC.timeZone,
+): boolean {
+  const at = start.getTime();
+  return enumerateSlotStarts(start, durationMin, timeZone).some((s) => s.getTime() === at);
+}
+
 export function addMinutes(d: Date, minutes: number): Date {
   return new Date(d.getTime() + minutes * 60_000);
 }

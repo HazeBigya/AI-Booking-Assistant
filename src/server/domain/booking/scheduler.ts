@@ -1,7 +1,7 @@
 // Deterministic orchestration: every rule is re-checked here, against the port.
 
 import { computeAvailableSlots, overlaps, type Interval } from "./availability";
-import { CLINIC, enumerateSlotStarts, isWithinClinicHours, addMinutes } from "./rules";
+import { CLINIC, enumerateSlotStarts, isSlotStart, isWithinClinicHours, addMinutes } from "./rules";
 import {
   DoubleBookingError,
   type BookingRepository,
@@ -162,7 +162,13 @@ export type BookingResult =
   | { ok: false; reason: BookingRejectionReason; message: string };
 
 export type BookingRejectionReason =
-  "unknown_service" | "in_past" | "outside_hours" | "not_qualified" | "slot_taken" | "patient_busy";
+  | "unknown_service"
+  | "in_past"
+  | "outside_hours"
+  | "not_a_slot"
+  | "not_qualified"
+  | "slot_taken"
+  | "patient_busy";
 
 export async function createBooking(
   repo: BookingRepository,
@@ -200,6 +206,20 @@ export async function createBooking(
       ok: false,
       reason: "outside_hours",
       message: "That time is outside clinic hours (Mon–Fri, 09:00–17:00).",
+    };
+  }
+
+  // Being inside opening hours is not the same as being a time the clinic
+  // offers. Appointments start on the half hour, so a start of 14:45 is not a
+  // late slot — it is a time that was never on any list, and the only way to
+  // arrive at one is to have calculated it rather than chosen it.
+  if (!isSlotStart(input.start, service.durationMinutes)) {
+    return {
+      ok: false,
+      reason: "not_a_slot",
+      message:
+        "That is not one of the clinic's appointment times. Appointments start on the " +
+        "half hour — check availability and pick one of the times offered.",
     };
   }
 

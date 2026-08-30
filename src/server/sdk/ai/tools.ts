@@ -114,7 +114,9 @@ export const toolDefs: ToolDef[] = [
       "so never guess and never substitute a different dentist. Do NOT judge time conflicts " +
       "yourself: appointments are end-exclusive (9-10 and 10-11 do NOT clash) and this tool " +
       "rejects genuine clashes — call it and report what it returns rather than refusing on " +
-      "your own arithmetic. On success the result carries 'confirmed' with the details to read " +
+      "your own arithmetic. The 'start' MUST be copied from a slot check_availability returned " +
+      "this turn — call it first if you have not, and never build the timestamp yourself. " +
+      "On success the result carries 'confirmed' with the details to read " +
       "back; on failure 'confirmed' is null and you must tell the patient plainly that it did " +
       "NOT go through, with the reason given.",
     parameters: {
@@ -128,7 +130,14 @@ export const toolDefs: ToolDef[] = [
           type: "string",
           description: "The dentist's name exactly as the patient requested, e.g. 'John'.",
         },
-        start: { type: "string", description: "Start, ISO 8601 (e.g. 2026-08-26T09:00:00Z)." },
+        start: {
+          type: "string",
+          description:
+            "COPY a 'start' value verbatim from this turn's check_availability slots. Never " +
+            "compose one and never adjust it. It is an exact instant, not a wall clock: the " +
+            "clinic's 9am is not 09:00Z unless the clinic happens to sit on UTC, and writing " +
+            "the hour the patient said followed by Z books a different time of day.",
+        },
         patientName: { type: "string", description: "The patient's full name." },
       },
       required: ["serviceName", "dentistName", "start", "patientName"],
