@@ -2,7 +2,18 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatTurn } from "@client/api/chat";
 
-export function MessageBubble({ turn, index }: { turn: ChatTurn; index: number }) {
+export function MessageBubble({
+  turn,
+  index,
+  onSpeak,
+}: {
+  turn: ChatTurn;
+  index: number;
+  // Absent when voice is not configured, which is also why the control is not
+  // rendered at all rather than rendered disabled: an button nobody can use is
+  // just an unanswered question about why.
+  onSpeak?: () => void;
+}) {
   const mine = turn.role === "user";
 
   return (
@@ -29,9 +40,43 @@ export function MessageBubble({ turn, index }: { turn: ChatTurn; index: number }
               prose-li:my-0.5 prose-a:text-accent-700"
           >
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.content}</ReactMarkdown>
+            {onSpeak && (
+              <button
+                type="button"
+                onClick={onSpeak}
+                aria-label="Read this reply aloud"
+                title="Read aloud"
+                className="mt-2 -ml-1 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs
+                  text-ink-faint transition hover:bg-zinc-100 hover:text-ink-soft
+                  focus-visible:outline-2 focus-visible:outline-offset-2
+                  focus-visible:outline-accent-600"
+              >
+                <SpeakerIcon />
+                Listen
+              </button>
+            )}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function SpeakerIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </svg>
   );
 }

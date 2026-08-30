@@ -14,9 +14,16 @@ export function isCaptureSupported(): boolean {
   );
 }
 
-// Resolves once recording has started. The returned function cancels the turn
-// and discards the audio; a natural end fires onDone instead.
-export async function startCapture(onDone: (blob: Blob) => void): Promise<() => void> {
+export interface Capture {
+  stop(): void; // ends the turn and sends what was said
+  cancel(): void; // ends the turn and throws it away
+}
+
+// Resolves once recording has started. Silence ends the turn on its own, but a
+// patient must also be able to end it deliberately — waiting out a timer is not
+// an interaction, and someone who has finished should not have to sit still to
+// prove it.
+export async function startCapture(onDone: (blob: Blob) => void): Promise<Capture> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const mimeType = MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m));
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -65,7 +72,7 @@ export async function startCapture(onDone: (blob: Blob) => void): Promise<() => 
   recorder.start(250); // chunk often so stopping never loses the tail
   frame = requestAnimationFrame(tick);
 
-  return () => finish(false);
+  return { stop: () => finish(true), cancel: () => finish(false) };
 }
 
 function rms(samples: Float32Array): number {

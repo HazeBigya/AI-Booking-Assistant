@@ -13,9 +13,16 @@ export interface SilenceOptions {
   maxMs?: number;       // hard stop, so a stuck mic cannot record forever
 }
 
+// silenceMs is generous on purpose. 800ms is roughly the pause inside a fluent
+// native sentence, so it cut people off between clauses — and it punished
+// exactly the patients least able to absorb it: anyone speaking a second
+// language, anyone elderly, anyone thinking about a date. Being interrupted
+// mid-question costs the whole question; waiting an extra second costs a
+// second, and the mic button now ends the turn immediately for anyone who does
+// not want to wait at all.
 export const DEFAULT_SILENCE: Required<SilenceOptions> = {
   threshold: 0.02,
-  silenceMs: 800,
+  silenceMs: 2000,
   minSpeechMs: 300,
   maxMs: 30_000,
 };

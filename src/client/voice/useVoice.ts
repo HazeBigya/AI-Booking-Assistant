@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConversationState } from "@client/components/chat/types";
 import { getVoiceConfig, speak, transcribe } from "./api";
-import { isCaptureSupported, startCapture } from "./capture";
+import { isCaptureSupported, startCapture, type Capture } from "./capture";
 import { PlaybackQueue } from "./playback";
 import { toSpeakable } from "./speakable";
 
@@ -17,7 +17,7 @@ interface Params {
 export function useVoice({ onTranscript, setState }: Params) {
   const [disabledReason, setDisabledReason] = useState<string | null>("Checking voice…");
   const [listening, setListening] = useState(false);
-  const cancelRef = useRef<(() => void) | null>(null);
+  const captureRef = useRef<Capture | null>(null);
   const queueRef = useRef<PlaybackQueue | null>(null);
 
   useEffect(() => {
@@ -40,8 +40,15 @@ export function useVoice({ onTranscript, setState }: Params) {
     async (reply: string) => {
       const sentences = toSpeakable(reply);
       if (sentences.length === 0) return;
-      setState("speaking");
-      const queue = new PlaybackQueue(playBlob);
+
+      // Stay on 'thinking' until sound actually arrives. Announcing 'speaking'
+      // at the top of this function was a lie for as long as the first clip
+      // took to synthesise — seconds of silence under a label claiming audio,
+      // which reads as a hang rather than as work in progress.
+      const queue = new PlaybackQueue(async (clip) => {
+        setState("speaking");
+        await playBlob(clip);
+      });
       queueRef.current = queue;
       sentences.forEach((sentence, i) => queue.enqueue(i, speak(sentence)));
       await queue.whenDrained();
@@ -53,10 +60,11 @@ export function useVoice({ onTranscript, setState }: Params) {
 
   const toggle = useCallback(async () => {
     if (listening) {
-      cancelRef.current?.();
-      cancelRef.current = null;
-      setListening(false);
-      setState("idle");
+      // Send what was said, do not discard it. Pressing the mic to finish is
+      // how someone ends a turn on purpose instead of waiting out the silence
+      // timer, and throwing the audio away there loses the whole question.
+      captureRef.current?.stop();
+      captureRef.current = null;
       return;
     }
 
@@ -65,8 +73,8 @@ export function useVoice({ onTranscript, setState }: Params) {
     setState("listening");
 
     try {
-      cancelRef.current = await startCapture(async (blob) => {
-        cancelRef.current = null;
+      captureRef.current = await startCapture(async (blob) => {
+        captureRef.current = null;
         setListening(false);
         setState("thinking");
         try {
@@ -90,7 +98,19 @@ export function useVoice({ onTranscript, setState }: Params) {
     }
   }, [listening, onTranscript, setState, speakReply]);
 
-  return { disabledReason, listening, toggle };
+  // Reading a reply aloud on request. A typed question is answered in text and
+  // stays silent — someone who is reading did not ask to be talked at — but the
+  // same reply is one tap from being spoken, which is what a patient who typed
+  // and then looked away actually needs.
+  const speakText = useCallback(
+    async (text: string) => {
+      queueRef.current?.stop(); // a second tap replaces the reply in flight
+      await speakReply(text);
+    },
+    [speakReply],
+  );
+
+  return { disabledReason, listening, toggle, speakText };
 }
 
 function playBlob(clip: Blob): Promise<void> {

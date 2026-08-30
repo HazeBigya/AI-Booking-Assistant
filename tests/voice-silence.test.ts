@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SilenceDetector } from "@client/voice/silence";
+import { DEFAULT_SILENCE, SilenceDetector } from "@client/voice/silence";
 
 // Feed a series of [level, ms] samples and return the last verdict.
 function feed(det: SilenceDetector, samples: [number, number][]) {
@@ -92,5 +92,26 @@ describe("SilenceDetector", () => {
     ]);
     det.reset();
     expect(det.push(0.001, 300)).toBe("listening");
+  });
+
+  // The pause someone takes mid-thought, or between clauses in a language they
+  // are still learning, must not be read as the end of their turn: being cut
+  // off loses the whole question, while waiting loses a second.
+  it("does not end the turn on a pause of a second and a half", () => {
+    const det = new SilenceDetector();
+    expect(
+      feed(det, [
+        [0.2, 0],
+        [0.2, 400],
+        [0.001, 500],
+        [0.001, 1900],
+      ]),
+    ).not.toBe("done");
+    // Still the same turn once they carry on.
+    expect(det.push(0.2, 2000)).toBe("speaking");
+  });
+
+  it("defaults to a pause long enough for a hesitant speaker", () => {
+    expect(DEFAULT_SILENCE.silenceMs).toBeGreaterThanOrEqual(1500);
   });
 });

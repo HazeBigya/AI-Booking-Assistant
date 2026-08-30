@@ -118,7 +118,16 @@ export function Chat() {
 
             <div className="stagger flex flex-col gap-5">
               {messages.map((m, i) => (
-                <MessageBubble key={i} turn={m} index={Math.min(i, 8)} />
+                <MessageBubble
+                  key={i}
+                  turn={m}
+                  index={Math.min(i, 8)}
+                  onSpeak={
+                    voice.disabledReason || m.role !== "assistant"
+                      ? undefined
+                      : () => void voice.speakText(m.content)
+                  }
+                />
               ))}
             </div>
 
