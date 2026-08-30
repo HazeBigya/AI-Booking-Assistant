@@ -16,12 +16,23 @@ export function createResendMailer(apiKey: string, from: string): Mailer {
       if (error) throw new Error(`Resend failed: ${error.message}`);
     },
     async sendInvite(invite: CalendarInvite): Promise<void> {
+      const method = invite.method ?? "REQUEST";
+      const cancelled = method === "CANCEL";
       const { error } = await resend.emails.send({
         from,
         to: invite.to.email,
         ...renderInviteEmail(invite),
         attachments: [
-          { filename: "invite.ics", content: Buffer.from(buildIcs(invite)).toString("base64") },
+          {
+            // The method belongs in the content type, not just inside the file:
+            // it is what tells a mail client this is a calendar action rather
+            // than a document, and which action it is. Without it the same
+            // bytes arrive as an unremarkable attachment. nodemailer sets this
+            // for the SMTP path via icalEvent; here it is ours to set.
+            filename: cancelled ? "cancellation.ics" : "invitation.ics",
+            contentType: `text/calendar; charset=utf-8; method=${method}`,
+            content: Buffer.from(buildIcs(invite)).toString("base64"),
+          },
         ],
       });
       if (error) throw new Error(`Resend failed: ${error.message}`);
