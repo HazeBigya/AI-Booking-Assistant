@@ -30,7 +30,7 @@ export function createSmtpMailer(cfg: SmtpConfig): Mailer {
       const mail = renderInviteEmail(invite);
       await transport.sendMail({
         from: cfg.from,
-        to: invite.attendees.map((a) => a.email),
+        to: invite.to.email,
         ...mail,
         icalEvent: { method: invite.method ?? "REQUEST", content: buildIcs(invite) },
       });

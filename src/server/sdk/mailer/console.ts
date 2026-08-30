@@ -8,7 +8,7 @@ export const consoleMailer: Mailer = {
     console.log(`[DEV OTP] ${to} -> ${code}`);
   },
   async sendInvite(invite: CalendarInvite): Promise<void> {
-    const to = invite.attendees.map((a) => a.email).join(", ");
+    const to = invite.to.email;
     const tag = invite.method === "CANCEL" ? "DEV CANCEL" : "DEV INVITE";
     console.log(`[${tag}] ${invite.summary} -> ${to}`);
   },

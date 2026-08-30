@@ -18,7 +18,7 @@ export function createResendMailer(apiKey: string, from: string): Mailer {
     async sendInvite(invite: CalendarInvite): Promise<void> {
       const { error } = await resend.emails.send({
         from,
-        to: invite.attendees.map((a) => a.email),
+        to: invite.to.email,
         ...renderInviteEmail(invite),
         attachments: [
           { filename: "invite.ics", content: Buffer.from(buildIcs(invite)).toString("base64") },

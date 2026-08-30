@@ -4,14 +4,11 @@ import { professionals, professionalServices, services } from "./schema";
 
 // Idempotent: skips if professionals already exist. `docker compose down -v` to reseed.
 
-// The clinic's three dentists share one inbox in the demo, because a calendar
-// invite has to arrive somewhere a person can open it. Configurable because it
-// genuinely differs per deployment, and because a real address hardcoded here
-// would ship in the repository and land in every clone's database.
-//
-// Resend's free sender only delivers to the address on the sending account, so
-// set this to that address if you want invites to arrive.
-const DENTIST_INBOX = process.env.DENTIST_EMAIL ?? "dentist@example.com";
+// The seeded dentists are fictional and nothing is ever delivered here — the
+// address exists so the .ics can name them as attendees, which is what an
+// invite naming both parties requires. A real clinic would reach its dentists
+// through their own calendars, not by emailing a shared inbox.
+const DENTIST_INBOX = "dentist@brightsmile.example";
 
 async function seed() {
   const existing = await db.select({ id: professionals.id }).from(professionals).limit(1);

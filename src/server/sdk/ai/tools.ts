@@ -413,6 +413,7 @@ export async function runTool(
               name: "Bright Smile Clinic",
               email: process.env.SMTP_USER ?? "no-reply@brightsmile.example",
             },
+            to: { name: parsed.data.patientName, email: ctx.authedEmail },
             attendees: [
               { name: parsed.data.patientName, email: ctx.authedEmail },
               ...(dentist ? [{ name: dentist.name, email: dentist.email }] : []),
@@ -467,6 +468,7 @@ export async function runTool(
           description: `Your ${cancelled.serviceName} appointment at Bright Smile Clinic has been cancelled.`,
           start: cancelled.start,
           end: cancelled.end,
+          to: { name: ctx.authedEmail.split("@")[0], email: ctx.authedEmail },
           organizer: {
             name: "Bright Smile Clinic",
             email: process.env.SMTP_USER ?? "no-reply@brightsmile.example",

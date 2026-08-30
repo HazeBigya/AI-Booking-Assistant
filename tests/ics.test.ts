@@ -9,6 +9,9 @@ const invite = {
   start: new Date("2026-08-24T09:00:00Z"),
   end: new Date("2026-08-24T10:00:00Z"),
   organizer: { name: "Bright Smile Clinic", email: "clinic@example.com" },
+  // Delivered to the patient; the dentist is an attendee of the event, not a
+  // recipient of the mail.
+  to: { name: "Pat", email: "pat@example.com" },
   attendees: [
     { name: "Pat", email: "pat@example.com" },
     { name: "Kate", email: "kate@example.com" },
