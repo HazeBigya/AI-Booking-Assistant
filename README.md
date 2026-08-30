@@ -163,9 +163,13 @@ fed and the perceived gap drops to roughly 1.5 seconds. An indexed FIFO queue
 keeps playback in order — a short sentence returns from TTS before a long
 earlier one, so without it the reply would play back scrambled.
 
-Recordings land in `storage/voice/` (gitignored) for debugging what the model
-misheard. Nothing reads them back in the request path; losing the directory
-loses nothing.
+**Recordings are not kept.** The transcript is already stored as an ordinary
+chat message, so keeping the audio too would add nothing the product uses —
+only a patient's voice on a disk with no retention policy and no deletion path.
+Set `VOICE_SAVE_RECORDINGS=1` and they land in `storage/voice/` (gitignored),
+which is worth doing while tuning the endpointing: replaying a bad turn
+separates a mic problem from a mishearing from a misreading. Nothing reads them
+back in the request path, so losing the directory loses nothing.
 
 ## Tests
 
@@ -213,5 +217,7 @@ resolution and sequencing without touching the network.
   ~800ms of silence. Full-duplex barge-in — interrupting the bot mid-sentence,
   as the ElevenLabs demo does — needs bidirectional streaming and cancellation
   threaded through the tool loop, and is not built.
-- Voice selection is one env var, not an in-app picker; recordings are written
-  to local disk behind a `VoiceStore` interface, and S3 is a swap, not a rewrite.
+- Voice selection is one env var, not an in-app picker; recordings are off by
+  default and, when enabled, are written to local disk behind a `VoiceStore`
+  interface, so S3 is a swap rather than a rewrite. A real deployment that kept
+  them would also need a retention window and a per-patient deletion path.

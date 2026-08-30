@@ -2,16 +2,27 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createLocalVoiceStore } from "@server/sdk/voice/store";
+import { createLocalVoiceStore, getVoiceStore, resetVoiceStore } from "@server/sdk/voice/store";
+
+const TOUCHED = ["VOICE_SAVE_RECORDINGS", "VOICE_STORAGE_DIR"];
 
 let dir: string;
+let saved: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "voice-store-"));
+  saved = Object.fromEntries(TOUCHED.map((k) => [k, process.env[k]]));
+  for (const k of TOUCHED) delete process.env[k];
+  resetVoiceStore();
 });
 
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
+  for (const [k, v] of Object.entries(saved)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  resetVoiceStore();
 });
 
 describe("createLocalVoiceStore", () => {
@@ -32,5 +43,22 @@ describe("createLocalVoiceStore", () => {
   it("refuses a session id that would escape the root", async () => {
     const store = createLocalVoiceStore(dir);
     expect(await store.save("../../etc", new Uint8Array([1]), "audio/webm")).toBeNull();
+  });
+});
+
+// The transcript is already the record of the turn. Keeping the patient's voice
+// as well is a debugging choice someone has to make on purpose.
+describe("getVoiceStore", () => {
+  it("keeps nothing unless recordings are explicitly enabled", async () => {
+    process.env.VOICE_STORAGE_DIR = dir;
+    expect(await getVoiceStore().save("sess-1", new Uint8Array([1]), "audio/webm")).toBeNull();
+  });
+
+  it("writes to disk once VOICE_SAVE_RECORDINGS is set", async () => {
+    process.env.VOICE_STORAGE_DIR = dir;
+    process.env.VOICE_SAVE_RECORDINGS = "1";
+    resetVoiceStore();
+    const path = await getVoiceStore().save("sess-1", new Uint8Array([1]), "audio/webm");
+    expect(path).toContain("sess-1");
   });
 });

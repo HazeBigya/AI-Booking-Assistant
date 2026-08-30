@@ -31,11 +31,35 @@ export function createLocalVoiceStore(rootDir: string = DEFAULT_ROOT): VoiceStor
   };
 }
 
+// Keeping nothing is the honest default. The transcript is already the record
+// of the turn, stored as an ordinary chat message, so a recording adds no
+// product value — it only adds a patient's voice sitting on a disk with no
+// retention policy and no deletion path. Worth having while tuning the
+// endpointing, which is why it is one env var away rather than deleted.
+export function createNullVoiceStore(): VoiceStore {
+  return {
+    async save() {
+      return null;
+    },
+  };
+}
+
 let cached: VoiceStore | undefined;
 
+// Tests only: the cache would otherwise outlive an env change.
+export function resetVoiceStore(): void {
+  cached = undefined;
+}
+
 export function getVoiceStore(): VoiceStore {
-  cached ??= createLocalVoiceStore(process.env.VOICE_STORAGE_DIR ?? DEFAULT_ROOT);
+  cached ??= recordingsEnabled()
+    ? createLocalVoiceStore(process.env.VOICE_STORAGE_DIR ?? DEFAULT_ROOT)
+    : createNullVoiceStore();
   return cached;
+}
+
+function recordingsEnabled(): boolean {
+  return process.env.VOICE_SAVE_RECORDINGS === "1";
 }
 
 function extensionFor(mimeType: string): string {

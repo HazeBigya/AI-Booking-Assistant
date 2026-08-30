@@ -75,6 +75,7 @@ services:
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       # Absolute, because the app's cwd inside the image is not the repo root
       # and a relative path would put recordings somewhere surprising.
+      VOICE_SAVE_RECORDINGS: ${VOICE_SAVE_RECORDINGS:-}
       VOICE_STORAGE_DIR: /app/storage/voice
       HOSTNAME: "0.0.0.0"
     ports:
