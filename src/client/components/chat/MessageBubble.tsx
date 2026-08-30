@@ -12,7 +12,9 @@ export function MessageBubble({
   index: number;
   // Absent when voice is not configured, which is also why the control is not
   // rendered at all rather than rendered disabled: a button nobody can use is
-  // just an unanswered question about why.
+  // just an unanswered question about why. Starts the reading, and stops it
+  // again while it is running — a voice you cannot interrupt is a voice you
+  // have to sit through.
   onSpeak?: () => void;
   // True from the moment this reply starts being turned into audio until the
   // last sentence has played. Owned by the voice hook rather than by this
@@ -55,8 +57,8 @@ export function MessageBubble({
                 type="button"
                 onClick={onSpeak}
                 aria-busy={speaking}
-                aria-label="Read this reply aloud"
-                title="Read aloud"
+                aria-label={speaking ? "Stop reading this reply" : "Read this reply aloud"}
+                title={speaking ? "Stop" : "Read aloud"}
                 className={
                   "mt-2.5 -ml-1.5 flex items-center gap-1.5 rounded-lg border px-2.5 py-1 " +
                   "text-xs font-medium transition focus-visible:outline-2 " +
@@ -67,8 +69,8 @@ export function MessageBubble({
                       "hover:bg-zinc-50 hover:text-ink")
                 }
               >
-                {speaking ? <SpinnerIcon /> : <SpeakerIcon />}
-                {speaking ? "Reading aloud…" : "Listen"}
+                {speaking ? <StopIcon /> : <SpeakerIcon />}
+                {speaking ? "Stop" : "Listen"}
               </button>
             )}
           </>
@@ -97,27 +99,12 @@ function SpeakerIcon() {
   );
 }
 
-// Spins from the tap until the last sentence has finished playing, so the wait
-// while the first clip is synthesised does not look like a dead button.
-function SpinnerIcon() {
+// A square, the universal "this is playing, press to end it". Ringed so it
+// reads as an active control rather than as a disabled Listen.
+function StopIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 animate-spin" aria-hidden="true">
-      <circle
-        cx="12"
-        cy="12"
-        r="9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        opacity="0.25"
-      />
-      <path
-        d="M21 12a9 9 0 0 0-9-9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
+    <span className="grid h-3.5 w-3.5 place-items-center" aria-hidden="true">
+      <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
+    </span>
   );
 }

@@ -11,7 +11,13 @@ export class PlaybackQueue {
   private draining: Promise<void> = Promise.resolve();
   private stopped = false;
 
-  constructor(private readonly play: PlayFn) {}
+  // `interrupt` silences whatever is audible right now. Without it, stop() only
+  // prevents the NEXT sentence: the clip already playing runs to its end, which
+  // is how the assistant's own voice ended up recorded as the patient's answer.
+  constructor(
+    private readonly play: PlayFn,
+    private readonly interrupt?: () => void,
+  ) {}
 
   enqueue(index: number, clip: Promise<Blob>): void {
     // Swallow-and-rethrow now: an unrejected promise sitting in the map until
@@ -29,6 +35,7 @@ export class PlaybackQueue {
   stop(): void {
     this.stopped = true;
     this.pending.clear();
+    this.interrupt?.();
   }
 
   private async drain(): Promise<void> {

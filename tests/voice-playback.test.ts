@@ -61,4 +61,32 @@ describe("PlaybackQueue", () => {
     await q.whenDrained();
     expect(played).toEqual([]);
   });
+
+  // The bug this exists to prevent: stop() used to set a flag that only kept the
+  // NEXT sentence from playing, while the clip already sounding ran to its end —
+  // straight into a microphone the patient had just opened, so the assistant
+  // recorded herself and answered her own question.
+  it("silences the clip that is already playing", async () => {
+    let interrupted = false;
+    let released: (() => void) | undefined;
+
+    const queue = new PlaybackQueue(
+      () =>
+        new Promise<void>((resolve) => {
+          released = resolve;
+        }),
+      () => {
+        interrupted = true;
+        released?.(); // a paused clip ends where it was
+      },
+    );
+
+    queue.enqueue(0, Promise.resolve(new Blob(["one"])));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    queue.stop();
+    expect(interrupted).toBe(true);
+    await expect(queue.whenDrained()).resolves.toBeUndefined();
+  });
 });

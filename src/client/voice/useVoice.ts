@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { ConversationState } from "@client/components/chat/types";
 import { getVoiceConfig, speak, transcribe } from "./api";
 import { isCaptureSupported, startCapture, type Capture } from "./capture";
@@ -24,6 +24,9 @@ export function useVoice({ onTranscript, setState }: Params) {
   const [spokenText, setSpokenText] = useState<string | null>(null);
   const captureRef = useRef<Capture | null>(null);
   const queueRef = useRef<PlaybackQueue | null>(null);
+  // The clip currently audible. Pausing the queue is not enough to create
+  // silence — this is the thing making the noise.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!isCaptureSupported()) {
@@ -51,6 +54,16 @@ export function useVoice({ onTranscript, setState }: Params) {
     [],
   );
 
+  // Silence, immediately. Used both when the patient reaches for the microphone
+  // — otherwise the assistant's own voice goes down the open mic and comes back
+  // as their next question — and by the control they press to cut her off.
+  const stopSpeaking = useCallback(() => {
+    queueRef.current?.stop();
+    queueRef.current = null;
+    setSpokenText(null);
+    setState("idle");
+  }, [setState]);
+
   // Sentence one plays while sentence two is still being generated.
   const speakReply = useCallback(
     async (reply: string) => {
@@ -63,10 +76,13 @@ export function useVoice({ onTranscript, setState }: Params) {
       // ready while the patient sat through silence wondering if it had heard.
       setState("preparing");
       setSpokenText(reply);
-      const queue = new PlaybackQueue(async (clip) => {
-        setState("speaking");
-        await playBlob(clip);
-      });
+      const queue = new PlaybackQueue(
+        async (clip) => {
+          setState("speaking");
+          await playBlob(clip, audioRef);
+        },
+        () => silence(audioRef),
+      );
       queueRef.current = queue;
       sentences.forEach((sentence, i) => queue.enqueue(i, speak(sentence)));
       try {
@@ -90,7 +106,7 @@ export function useVoice({ onTranscript, setState }: Params) {
       return;
     }
 
-    queueRef.current?.stop(); // reaching for the mic cancels the reply in flight
+    stopSpeaking(); // never record the assistant answering herself
     setListening(true);
     setState("listening");
 
@@ -118,7 +134,7 @@ export function useVoice({ onTranscript, setState }: Params) {
       setListening(false);
       setState("idle");
     }
-  }, [listening, onTranscript, setState, speakReply]);
+  }, [listening, onTranscript, setState, speakReply, stopSpeaking]);
 
   // Reading a reply aloud on request. A typed question is answered in text and
   // stays silent — someone who is reading did not ask to be talked at — but the
@@ -126,28 +142,37 @@ export function useVoice({ onTranscript, setState }: Params) {
   // and then looked away actually needs.
   const speakText = useCallback(
     async (text: string) => {
-      queueRef.current?.stop(); // a second tap replaces the reply in flight
+      stopSpeaking(); // a second tap replaces the reply in flight
       // Deliberately does not set the global 'thinking' state: that disables the
       // composer, and replaying an old reply must not stop someone typing the
       // next question. The button spins on its own instead.
       await speakReply(text);
     },
-    [speakReply],
+    [speakReply, stopSpeaking],
   );
 
-  return { disabledReason, listening, toggle, speakText, spokenText };
+  return { disabledReason, listening, toggle, speakText, spokenText, stopSpeaking };
 }
 
-function playBlob(clip: Blob): Promise<void> {
+function playBlob(clip: Blob, ref: MutableRefObject<HTMLAudioElement | null>): Promise<void> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(clip);
     const audio = new Audio(url);
+    ref.current = audio;
     const done = () => {
       URL.revokeObjectURL(url);
+      if (ref.current === audio) ref.current = null;
       resolve();
     };
     audio.onended = done;
     audio.onerror = done; // a clip that will not decode must not stall the queue
+    // Pausing resolves nothing on its own, so an interrupted clip ends here.
+    audio.onpause = done;
     void audio.play().catch(done);
   });
+}
+
+function silence(ref: MutableRefObject<HTMLAudioElement | null>): void {
+  ref.current?.pause();
+  ref.current = null;
 }

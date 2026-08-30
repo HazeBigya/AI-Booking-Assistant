@@ -126,7 +126,10 @@ export function Chat() {
                   onSpeak={
                     voice.disabledReason || m.role !== "assistant"
                       ? undefined
-                      : () => void voice.speakText(m.content)
+                      : () =>
+                          voice.spokenText === m.content
+                            ? voice.stopSpeaking()
+                            : void voice.speakText(m.content)
                   }
                   speaking={voice.spokenText === m.content}
                 />
