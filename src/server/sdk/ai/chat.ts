@@ -1,7 +1,11 @@
 import { getLLMProvider, type ChatMessage } from "./providers";
 import { runTool, toolDefs, type ToolContext } from "./tools";
 
-const MAX_ITERATIONS = 6;
+// One round per model turn. A compound request spends four before it answers —
+// find the appointment, cancel it, check the new slot, book it — and a correction
+// takes another, which left the old budget of 6 landing exactly on the fallback
+// reply. Raised so a legitimate chain cannot run out; a stuck model still stops.
+const MAX_ITERATIONS = 8;
 const MAX_CORRECTIONS = 1;
 
 const FALLBACK_REPLY =
