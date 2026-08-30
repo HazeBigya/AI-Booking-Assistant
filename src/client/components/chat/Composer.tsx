@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { VoiceOrb } from "./VoiceOrb";
 import type { ConversationState } from "./types";
 
 const MAX_HEIGHT = 160; // px, matches max-h-40
@@ -50,35 +51,32 @@ export function Composer({
         (listening ? "border-accent-600/40 ring-4 ring-accent-400/10" : "border-zinc-200")
       }
     >
-      {/* At rest this has to read as a button. A bare grey glyph beside a solid
-          black Send disappears, and a patient who never notices the microphone
-          never learns the product can be spoken to. While recording it becomes
-          an explicit, labelled Stop: silence ends the turn eventually, but
-          nobody should have to discover that by waiting. */}
+      {/* The microphone keeps its own side of the composer and its own job:
+          start listening, then show that it is listening. A bare grey glyph
+          beside a solid black Send is easy to miss entirely, and a patient who
+          never notices the microphone never learns they can speak — so at rest
+          it reads as a button. While recording it is the pulsing orb, which is
+          the honest picture of a live mic; ending the turn belongs to the
+          button on the right, where ending a turn already lives. */}
       <button
         type="button"
         onClick={onToggleVoice}
         disabled={Boolean(voiceDisabledReason)}
-        title={voiceDisabledReason ?? (listening ? "Stop and send" : "Speak instead of typing")}
+        title={voiceDisabledReason ?? (listening ? "Recording — press Stop to send" : "Speak")}
         aria-pressed={listening}
-        aria-label={voiceDisabledReason ?? (listening ? "Stop recording and send" : "Speak")}
+        aria-label={voiceDisabledReason ?? (listening ? "Recording" : "Speak instead of typing")}
         className={
-          "flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border " +
-          "text-sm font-medium transition duration-300 ease-glide active:scale-[0.94] " +
-          "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 " +
+          "grid h-11 w-11 shrink-0 place-items-center rounded-full border transition " +
+          "duration-300 ease-glide active:scale-[0.94] disabled:cursor-not-allowed " +
+          "disabled:opacity-40 disabled:active:scale-100 " +
           (listening
-            ? "w-auto border-accent-600 bg-accent-600 px-4 text-white shadow-diffuse"
-            : "w-11 border-zinc-200 bg-zinc-50 text-ink-soft hover:border-zinc-300 " +
+            ? "border-accent-600/40 bg-accent-50 text-accent-700"
+            : "border-zinc-200 bg-zinc-50 text-ink-soft hover:border-zinc-300 " +
               "hover:bg-zinc-100 hover:text-ink")
         }
       >
         {listening ? (
-          <>
-            <span className="grid h-5 w-5 place-items-center">
-              <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
-            </span>
-            Stop
-          </>
+          <VoiceOrb state="listening" />
         ) : (
           <svg
             viewBox="0 0 24 24"
@@ -114,29 +112,50 @@ export function Composer({
           text-ink outline-none placeholder:text-ink-faint disabled:opacity-60"
       />
 
+      {/* One button, one meaning: end this turn and send it. Typing, it is Send;
+          recording, it is Stop. Putting Stop here rather than on the microphone
+          keeps the mic free to be the thing it is good at — showing that the
+          clinic is listening — and means a patient looking for "how do I finish"
+          finds it in the place they already finish. */}
       <button
         type="button"
-        onClick={onSend}
-        disabled={disabled || value.trim() === ""}
-        aria-label="Send message"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-zinc-50
-          transition duration-300 ease-glide hover:-translate-y-px active:translate-y-0 active:scale-[0.94]
-          disabled:pointer-events-none disabled:bg-zinc-200 disabled:text-zinc-400"
+        onClick={listening ? onToggleVoice : onSend}
+        disabled={listening ? false : disabled || value.trim() === ""}
+        aria-label={listening ? "Stop recording and send" : "Send message"}
+        title={listening ? "Stop and send" : undefined}
+        className={
+          "flex h-11 shrink-0 items-center justify-center gap-2 rounded-full text-sm " +
+          "font-medium transition duration-300 ease-glide hover:-translate-y-px " +
+          "active:translate-y-0 active:scale-[0.94] disabled:pointer-events-none " +
+          "disabled:bg-zinc-200 disabled:text-zinc-400 " +
+          (listening
+            ? "w-auto bg-accent-600 px-4 text-white shadow-diffuse"
+            : "w-11 bg-ink text-zinc-50")
+        }
       >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          strokeWidth={1.5}
-          className="h-5 w-5"
-          aria-hidden="true"
-        >
-          <path
-            d="M5 12h13M13 6.5 18.5 12 13 17.5"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        {listening ? (
+          <>
+            <span className="grid h-5 w-5 place-items-center">
+              <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
+            </span>
+            Stop
+          </>
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            strokeWidth={1.5}
+            className="h-5 w-5"
+            aria-hidden="true"
+          >
+            <path
+              d="M5 12h13M13 6.5 18.5 12 13 17.5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
       </button>
     </div>
   );

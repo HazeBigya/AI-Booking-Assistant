@@ -13,5 +13,5 @@ export interface SpeechToText {
 
 export interface TextToSpeech {
   readonly name: string;
-  speak(text: string, voice?: string): Promise<SpokenAudio>;
+  speak(text: string): Promise<SpokenAudio>;
 }

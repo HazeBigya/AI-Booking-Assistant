@@ -49,7 +49,7 @@ npm run dev               # http://localhost:3000, hot reload
 | `VOICE_PROVIDER` | one vendor for both ears and mouth: `openai` (default), `elevenlabs`, `deepgram`. Enough on its own for any of them |
 | `VOICE_STT_PROVIDER` | overrides the ears only: `openai`, `elevenlabs`, `deepgram`, `browser` (free, Chrome only, no key) |
 | `VOICE_TTS_PROVIDER` | overrides the mouth only: `openai`, `elevenlabs`, `deepgram`. No `browser` row on purpose — see Voice below |
-| `ELEVENLABS_API_KEY` / `DEEPGRAM_API_KEY` (+ `VOICE_STT_MODEL` / `VOICE_TTS_MODEL` / `VOICE_TTS_VOICE`) | one key per speech vendor; model ids are overridable because vendors rename them |
+| `ELEVENLABS_API_KEY` / `DEEPGRAM_API_KEY` (+ `VOICE_STT_MODEL` / `VOICE_TTS_MODEL`) | one key per speech vendor; model ids are overridable because vendors rename them. The voice itself is not configurable — see Voice below |
 | `CLINIC_TIMEZONE` | IANA name for the clinic's wall clock — sets opening hours and which slots exist |
 | `AUTH_SECRET` | signs the session JWT |
 | `SMTP_*` / `RESEND_API_KEY` / `MAIL_FROM` | email transport for OTP codes + calendar invites (falls back to console) |

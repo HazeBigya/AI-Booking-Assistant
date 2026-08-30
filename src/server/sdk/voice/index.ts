@@ -113,19 +113,11 @@ export function getTextToSpeech(): TextToSpeech {
   const vendor = pick(TTS_VENDORS, name, source, "VOICE_TTS_PROVIDER");
 
   if (name === "elevenlabs") {
-    ttsCache = createElevenLabsTTS({
-      apiKey: key(vendor),
-      model: model(vendor),
-      voice: env("VOICE_TTS_VOICE"),
-    });
+    ttsCache = createElevenLabsTTS({ apiKey: key(vendor), model: model(vendor) });
   } else if (name === "deepgram") {
     ttsCache = createDeepgramTTS({ apiKey: key(vendor), model: model(vendor) });
   } else {
-    ttsCache = createOpenAITTS({
-      apiKey: key(vendor),
-      model: model(vendor),
-      voice: env("VOICE_TTS_VOICE"),
-    });
+    ttsCache = createOpenAITTS({ apiKey: key(vendor), model: model(vendor) });
   }
   return ttsCache;
 }

@@ -35,6 +35,17 @@ export function useVoice({ onTranscript, setState }: Params) {
       .catch(() => setDisabledReason("Voice unavailable."));
   }, []);
 
+  // Leaving on a live turn discards it rather than sending it: nobody is left to
+  // hear the answer. Without this the microphone stays open and the browser's
+  // recording indicator stays lit after the conversation is gone.
+  useEffect(
+    () => () => {
+      captureRef.current?.cancel();
+      queueRef.current?.stop();
+    },
+    [],
+  );
+
   // Sentence one plays while sentence two is still being generated.
   const speakReply = useCallback(
     async (reply: string) => {

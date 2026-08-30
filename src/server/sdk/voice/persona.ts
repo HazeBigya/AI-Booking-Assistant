@@ -11,6 +11,19 @@
 // Female, warm and unhurried is a deliberate choice, not a default: this is the
 // voice of a person a patient is about to trust with a dental appointment, and
 // clipped efficiency reads as a queue system.
+//
+// The voices below are pinned rather than configurable. Which voice the clinic
+// has is a decision, like its opening hours, not something that differs between
+// deployments — and offering it as a setting would mean the receptionist above
+// is only a suggestion, undone by one line in a .env nobody reviews.
+
+// OpenAI's warmest female voice. alloy, the obvious default, is the flattest
+// they ship and was working against everything the direction below asks for.
+export const OPENAI_VOICE = "nova";
+
+// 'Rachel' — a warm female stock voice present on every ElevenLabs account, so
+// the connector matches this receptionist without anyone browsing a library.
+export const ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 
 // OpenAI's gpt-4o-mini-tts takes plain-English delivery direction.
 //

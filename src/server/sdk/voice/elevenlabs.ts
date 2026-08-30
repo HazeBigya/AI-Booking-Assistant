@@ -1,33 +1,29 @@
 import { extensionFor } from "./mime";
-import { ELEVENLABS_VOICE_SETTINGS } from "./persona";
+import { ELEVENLABS_VOICE_ID, ELEVENLABS_VOICE_SETTINGS } from "./persona";
 import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
-
-// 'Rachel' — a warm female stock voice present on every account, so the
-// connector matches the receptionist in persona.ts before anyone has browsed
-// the voice library. Override with VOICE_TTS_VOICE (a voice id, not a name).
-const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 
 export interface ElevenLabsConfig {
   apiKey: string;
   model: string;
-  voice?: string; // a voice id from elevenlabs.io/app/voice-library
 }
 
 // Reached with fetch rather than an SDK: one endpoint, no dependency.
 export function createElevenLabsTTS(cfg: ElevenLabsConfig): TextToSpeech {
   return {
     name: "elevenlabs",
-    async speak(text: string, voice?: string): Promise<SpokenAudio> {
-      const voiceId = voice ?? cfg.voice ?? DEFAULT_VOICE_ID;
-      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: "POST",
-        headers: { "xi-api-key": cfg.apiKey, "content-type": "application/json" },
-        body: JSON.stringify({
-          text,
-          model_id: cfg.model,
-          voice_settings: ELEVENLABS_VOICE_SETTINGS,
-        }),
-      });
+    async speak(text: string): Promise<SpokenAudio> {
+      const res = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+        {
+          method: "POST",
+          headers: { "xi-api-key": cfg.apiKey, "content-type": "application/json" },
+          body: JSON.stringify({
+            text,
+            model_id: cfg.model,
+            voice_settings: ELEVENLABS_VOICE_SETTINGS,
+          }),
+        },
+      );
       if (!res.ok) {
         throw new Error(`ElevenLabs TTS failed (${res.status}): ${await res.text()}`);
       }

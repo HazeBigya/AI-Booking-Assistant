@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as { text?: unknown; voice?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { text?: unknown } | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   if (!text) return NextResponse.json({ error: "No text to speak." }, { status: 400 });
   if (text.length > MAX_CHARS) {
@@ -24,10 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { audio, mimeType } = await tts.speak(
-      text,
-      typeof body?.voice === "string" ? body.voice : undefined,
-    );
+    const { audio, mimeType } = await tts.speak(text);
     return new Response(audio as unknown as BodyInit, {
       status: 200,
       headers: { "content-type": mimeType, "cache-control": "no-store" },
