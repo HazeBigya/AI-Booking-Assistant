@@ -93,11 +93,15 @@ export const toolDefs: ToolDef[] = [
   {
     name: "get_my_appointments",
     description:
-      "List ALL of the logged-in patient's own appointments — past and upcoming — each with " +
-      "the dentist and ready clinic-local date/time labels. No arguments; identity comes from " +
-      "the verified session. Requires the patient to be logged in. Never claim you cannot see " +
-      "past appointments: this returns them. You may group them into Upcoming and Past, but " +
-      "show every one it returns.",
+      "The logged-in patient's own appointments, already separated into `upcoming` and " +
+      "`past` — each with the dentist and ready clinic-local date/time labels. No arguments; " +
+      "identity comes from the verified session. Requires the patient to be logged in. " +
+      "Never claim you cannot see past appointments: this returns them. " +
+      "Lead with `upcoming`, which is what someone asking about their appointments almost " +
+      "always means. Do not read `past` out unless they asked about it — say how many there " +
+      "are and offer them. Never merge the two lists: a visit last week and a booking " +
+      "tomorrow are not the same kind of thing, and running them together makes the patient " +
+      "work out which is which.",
     parameters: { type: "object", properties: {}, required: [] },
   },
   {
@@ -335,7 +339,19 @@ export async function runTool(
         return errorResult("The patient must be logged in to view their appointments.");
       }
       const appointments = await getAppointmentsForPatient(ctx.authedEmail);
-      return JSON.stringify(appointments.map((a) => describeAppointment(a, ctx)));
+      // Split here, not in the prompt. Whether an appointment has happened is a
+      // fact about the clock, and the model has to infer "now" from a sentence
+      // while this can simply read it — the same reason it never decides
+      // availability. Returned flat, it read a finished visit and a booking
+      // tomorrow out in one undifferentiated list.
+      const now = Date.now();
+      const past: ReturnType<typeof describeAppointment>[] = [];
+      const upcoming: ReturnType<typeof describeAppointment>[] = [];
+      for (const a of appointments) {
+        // An appointment being sat through right now is not over.
+        (a.end.getTime() <= now ? past : upcoming).push(describeAppointment(a, ctx));
+      }
+      return JSON.stringify({ upcoming, past });
     }
 
     case "create_booking": {
