@@ -6,7 +6,7 @@ export function MessageBubble({
   turn,
   index,
   onSpeak,
-  speaking,
+  audio = "idle",
 }: {
   turn: ChatTurn;
   index: number;
@@ -16,13 +16,15 @@ export function MessageBubble({
   // again while it is running — a voice you cannot interrupt is a voice you
   // have to sit through.
   onSpeak?: () => void;
-  // True from the moment this reply starts being turned into audio until the
-  // last sentence has played. Owned by the voice hook rather than by this
-  // component, so a reply spoken by the microphone shows it too — not only one
-  // the reader started by pressing Listen.
-  speaking?: boolean;
+  // Three states, not two: `preparing` is the second or two of silence while
+  // the first clip is synthesised, and it needs to look different from playing
+  // or the button appears to have done nothing. Owned by the voice hook rather
+  // than by this component, so a reply spoken through the microphone shows the
+  // same thing as one the reader started by pressing Listen.
+  audio?: "idle" | "preparing" | "playing";
 }) {
   const mine = turn.role === "user";
+  const busy = audio !== "idle";
 
   return (
     <div
@@ -56,21 +58,27 @@ export function MessageBubble({
               <button
                 type="button"
                 onClick={onSpeak}
-                aria-busy={speaking}
-                aria-label={speaking ? "Stop reading this reply" : "Read this reply aloud"}
-                title={speaking ? "Stop" : "Read aloud"}
+                aria-busy={audio === "preparing"}
+                aria-label={busy ? "Stop reading this reply" : "Read this reply aloud"}
+                title={busy ? "Stop" : "Read aloud"}
                 className={
                   "mt-2.5 -ml-1.5 flex items-center gap-1.5 rounded-lg border px-2.5 py-1 " +
                   "text-xs font-medium transition focus-visible:outline-2 " +
                   "focus-visible:outline-offset-2 focus-visible:outline-accent-600 " +
-                  (speaking
+                  (busy
                     ? "border-accent-600/30 bg-accent-50 text-accent-700"
                     : "border-zinc-200/80 text-ink-soft hover:border-zinc-300 " +
                       "hover:bg-zinc-50 hover:text-ink")
                 }
               >
-                {speaking ? <StopIcon /> : <SpeakerIcon />}
-                {speaking ? "Stop" : "Listen"}
+                {audio === "preparing" ? (
+                  <SpinnerIcon />
+                ) : audio === "playing" ? (
+                  <StopIcon />
+                ) : (
+                  <SpeakerIcon />
+                )}
+                {busy ? "Stop" : "Listen"}
               </button>
             )}
           </>
@@ -106,5 +114,30 @@ function StopIcon() {
     <span className="grid h-3.5 w-3.5 place-items-center" aria-hidden="true">
       <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
     </span>
+  );
+}
+
+// Spins through the wait between pressing Listen and the first sound, which is
+// otherwise indistinguishable from a button that did nothing.
+function SpinnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 animate-spin" aria-hidden="true">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        opacity="0.25"
+      />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

@@ -131,7 +131,13 @@ export function Chat() {
                             ? voice.stopSpeaking()
                             : void voice.speakText(m.content)
                   }
-                  speaking={voice.spokenText === m.content}
+                  audio={
+                    voice.spokenText !== m.content
+                      ? "idle"
+                      : state === "preparing"
+                        ? "preparing"
+                        : "playing"
+                  }
                 />
               ))}
             </div>
