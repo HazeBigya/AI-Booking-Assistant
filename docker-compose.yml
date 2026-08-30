@@ -27,6 +27,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://clinic:clinic@db:5432/clinic
+      # Read by the seed only. The dentists' invites have to arrive somewhere.
+      DENTIST_EMAIL: ${DENTIST_EMAIL:-}
 
   app:
     build: .

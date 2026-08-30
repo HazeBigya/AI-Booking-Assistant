@@ -3,6 +3,16 @@ import { db, pool } from "./client";
 import { professionals, professionalServices, services } from "./schema";
 
 // Idempotent: skips if professionals already exist. `docker compose down -v` to reseed.
+
+// The clinic's three dentists share one inbox in the demo, because a calendar
+// invite has to arrive somewhere a person can open it. Configurable because it
+// genuinely differs per deployment, and because a real address hardcoded here
+// would ship in the repository and land in every clone's database.
+//
+// Resend's free sender only delivers to the address on the sending account, so
+// set this to that address if you want invites to arrive.
+const DENTIST_INBOX = process.env.DENTIST_EMAIL ?? "dentist@example.com";
+
 async function seed() {
   const existing = await db.select({ id: professionals.id }).from(professionals).limit(1);
   if (existing.length > 0) {
@@ -62,21 +72,21 @@ async function seed() {
     .values([
       {
         name: "John",
-        email: "bigya.developer@gmail.com", // dummy dentist inbox (demo)
+        email: DENTIST_INBOX,
         title: "Junior Dentist",
         level: "junior",
         bio: "Junior dentist, 3 years' experience. Handles routine checkups and whitening.",
       },
       {
         name: "Oscar",
-        email: "bigya.developer@gmail.com",
+        email: DENTIST_INBOX,
         title: "Senior Dentist",
         level: "senior",
         bio: "Senior dentist, 15 years' experience. Focus on restorative work: fillings, root canals, full restorations.",
       },
       {
         name: "Kate",
-        email: "bigya.developer@gmail.com",
+        email: DENTIST_INBOX,
         title: "Senior Dentist",
         level: "senior",
         bio: "Senior dentist, 12 years' experience. Lead cosmetic dentist; whitening and aesthetics are her focus.",

@@ -410,7 +410,7 @@ export async function runTool(
             ],
           });
         } catch (err) {
-          console.error("sendInvite failed:", err);
+          console.error(`[mail] invite not sent: ${errText(err)}`);
         }
         return JSON.stringify({
           ...result,
@@ -468,7 +468,7 @@ export async function runTool(
           ],
         });
       } catch (err) {
-        console.error("sendInvite (cancel) failed:", err);
+        console.error(`[mail] cancellation notice not sent: ${errText(err)}`);
       }
       return JSON.stringify({ ok: true, cancelled });
     }
@@ -575,4 +575,12 @@ function zodMessage(error: z.ZodError): string {
   return (
     "Invalid arguments: " + error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")
   );
+}
+
+// A failed invite never blocks the booking, so its log line is all anyone gets —
+// and a stack trace through the mail SDK says nothing a reader can act on. The
+// transport's own message does: Resend, for one, names the exact restriction and
+// the page that lifts it.
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
