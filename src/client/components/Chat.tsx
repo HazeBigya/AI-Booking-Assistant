@@ -172,7 +172,7 @@ export function Chat() {
               onSend={() => send()}
               onToggleVoice={voice.toggle}
               voiceDisabledReason={voice.disabledReason}
-              state={state}
+              listening={voice.listening}
               disabled={busy}
             />
             <p className="mt-2.5 px-1 text-xs text-ink-faint">

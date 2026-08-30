@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { VoiceOrb } from "./VoiceOrb";
-import type { ConversationState } from "./types";
 
 const MAX_HEIGHT = 160; // px, matches max-h-40
 
@@ -12,7 +11,7 @@ export function Composer({
   onSend,
   onToggleVoice,
   voiceDisabledReason,
-  state,
+  listening,
   disabled,
 }: {
   value: string;
@@ -22,11 +21,14 @@ export function Composer({
   // Non-null means the mic cannot work, and this says why — naming the missing
   // env var rather than letting the patient press a button that fails.
   voiceDisabledReason?: string | null;
-  state: ConversationState;
+  // Straight from the recorder rather than inferred from the shared state enum.
+  // Those two disagreed once — a stale cleanup reset the enum to idle while the
+  // microphone was genuinely open — and the composer showed a mic that was not
+  // recording while it recorded. What the button claims is now what is true.
+  listening: boolean;
   disabled: boolean;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const listening = state === "listening";
 
   useEffect(() => {
     if (!disabled) inputRef.current?.focus();

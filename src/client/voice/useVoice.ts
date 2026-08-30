@@ -27,6 +27,17 @@ export function useVoice({ onTranscript, setState }: Params) {
   // The clip currently audible. Pausing the queue is not enough to create
   // silence — this is the thing making the noise.
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Bumped whenever speech is superseded — stopped, or replaced by a new reply.
+  // The run that was cancelled still finishes its await and reaches its cleanup
+  // a tick later, by which time the patient may already be recording; without
+  // this it resets the state to idle underneath them, and the interface shows an
+  // idle microphone while the recorder is genuinely running.
+  const speechRun = useRef(0);
+  // getUserMedia can sit on a permission prompt for as long as the patient takes
+  // to answer it. A press during that window has nothing to stop yet, so it is
+  // recorded here and honoured the moment the recorder exists — otherwise the
+  // button says idle and the microphone opens anyway.
+  const abandonStart = useRef(false);
 
   useEffect(() => {
     if (!isCaptureSupported()) {
@@ -58,6 +69,7 @@ export function useVoice({ onTranscript, setState }: Params) {
   // — otherwise the assistant's own voice goes down the open mic and comes back
   // as their next question — and by the control they press to cut her off.
   const stopSpeaking = useCallback(() => {
+    speechRun.current++;
     queueRef.current?.stop();
     queueRef.current = null;
     setSpokenText(null);
@@ -74,6 +86,7 @@ export function useVoice({ onTranscript, setState }: Params) {
       // 'speaking' up front was a lie for as long as the first clip took to
       // synthesise, and leaving it on 'idle' was worse — the app claimed to be
       // ready while the patient sat through silence wondering if it had heard.
+      const run = ++speechRun.current;
       setState("preparing");
       setSpokenText(reply);
       const queue = new PlaybackQueue(
@@ -88,9 +101,13 @@ export function useVoice({ onTranscript, setState }: Params) {
       try {
         await queue.whenDrained();
       } finally {
-        queueRef.current = null;
-        setSpokenText(null);
-        setState("idle");
+        // Only tidy up if this run is still the current one. Anything else has
+        // already set the state it wants and must not be overwritten.
+        if (speechRun.current === run) {
+          queueRef.current = null;
+          setSpokenText(null);
+          setState("idle");
+        }
       }
     },
     [setState],
@@ -101,17 +118,25 @@ export function useVoice({ onTranscript, setState }: Params) {
       // Send what was said, do not discard it. Pressing the mic to finish is
       // how someone ends a turn on purpose instead of waiting out the silence
       // timer, and throwing the audio away there loses the whole question.
-      captureRef.current?.stop();
-      captureRef.current = null;
+      if (captureRef.current) {
+        captureRef.current.stop();
+        captureRef.current = null;
+      } else {
+        // Still waiting on the microphone permission prompt.
+        abandonStart.current = true;
+        setListening(false);
+        setState("idle");
+      }
       return;
     }
 
     stopSpeaking(); // never record the assistant answering herself
+    abandonStart.current = false;
     setListening(true);
     setState("listening");
 
     try {
-      captureRef.current = await startCapture(async (blob) => {
+      const capture = await startCapture(async (blob) => {
         captureRef.current = null;
         setListening(false);
         setState("thinking");
@@ -128,6 +153,12 @@ export function useVoice({ onTranscript, setState }: Params) {
           setState("idle");
         }
       });
+      // Pressed again while the prompt was up: honour it now the mic is real.
+      if (abandonStart.current) {
+        capture.cancel();
+        return;
+      }
+      captureRef.current = capture;
     } catch {
       // Almost always a denied microphone permission.
       setDisabledReason("Microphone permission denied.");
