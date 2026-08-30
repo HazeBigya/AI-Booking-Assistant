@@ -1,3 +1,4 @@
+import { describeFailure } from "./failure";
 import type { ChatRequest, ChatResponse, LLMProvider } from "./types";
 
 // Per-call: each request carries full context, so falling through
@@ -15,10 +16,13 @@ export function createFallbackChain(providers: LLMProvider[]): LLMProvider {
           return await provider.chat(req);
         } catch (err) {
           lastError = err;
-          console.warn(`LLM ${provider.name} failed, trying next:`, err);
+          console.warn(describeFailure(provider.name, err));
         }
       }
-      throw new Error(`All LLM providers failed: ${String(lastError)}`);
+      // Rethrown as-is. Wrapping it in a string threw away the status and the
+      // vendor's own message, which is exactly what the caller needs to tell a
+      // mistyped model name from a network blip.
+      throw lastError;
     },
 
     async classify(input: string, labels: string[]): Promise<string> {

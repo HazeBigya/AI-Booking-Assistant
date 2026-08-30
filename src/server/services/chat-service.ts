@@ -9,6 +9,7 @@ import {
   saveChatMessage,
 } from "@server/db/queries/chat";
 import { findOrCreatePatient } from "@server/auth/patients";
+import { classifyFailure, describeFailure } from "@server/sdk/ai/providers/failure";
 import { CLINIC } from "@server/domain/booking/rules";
 import { formatZonedDate, formatZonedTime, zonedDateKey } from "@server/domain/booking/timezone";
 
@@ -88,9 +89,14 @@ export async function handleChat(
     reply = validateOutput(result.reply);
     totalTokens = result.totalTokens;
   } catch (err) {
-    console.error("all LLM providers failed:", err);
+    // One actionable line rather than a minified stack, and a reply that does
+    // not promise a retry will help when it provably will not.
+    console.error(describeFailure(process.env.AI_PROVIDER || "AI_PROVIDER (unset)", err));
     reply =
-      "I'm sorry — I can't reach our booking assistant right now. Please try again in a moment.";
+      classifyFailure(err).kind === "config"
+        ? "I'm sorry — our booking assistant isn't set up correctly right now, so I can't " +
+          "check the diary. Please call the clinic and we'll book you in directly."
+        : "I'm sorry — I can't reach our booking assistant right now. Please try again in a moment.";
   }
 
   await saveChatMessage(sessionId, "user", userMessage);
