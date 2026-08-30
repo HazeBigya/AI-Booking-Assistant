@@ -16,16 +16,36 @@ export interface OpenAIAdapterConfig {
 export function createOpenAIProvider(cfg: OpenAIAdapterConfig): LLMProvider {
   const client = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL });
 
+  // Reasoning models default to thinking before answering, and refuse function
+  // tools on this endpoint while they do. They accept them with reasoning turned
+  // off, which is right for this app anyway: nothing here needs the model to
+  // reason at length, only to pick a tool and read back what it returns.
+  //
+  // Learned from the API rather than from a list of model names, because such a
+  // list is stale the day it is written — the model that hit this was released
+  // after everything else in the file. Sticky, so the tool loop pays the failed
+  // attempt once per process rather than on every step of every turn.
+  let reasoningOff = false;
+
   return {
     name: cfg.name,
 
     async chat(req: ChatRequest): Promise<ChatResponse> {
-      const res = await client.chat.completions.create({
+      const body: CompletionBody = {
         model: cfg.model,
         temperature: req.temperature ?? 0,
         messages: req.messages.map(toWireMessage),
         tools: req.tools?.map(toWireTool),
-      });
+      };
+
+      let res;
+      try {
+        res = await client.chat.completions.create(withReasoningOff(body, reasoningOff));
+      } catch (err) {
+        if (reasoningOff || !rejectsToolsWhileReasoning(err)) throw err;
+        reasoningOff = true;
+        res = await client.chat.completions.create(withReasoningOff(body, true));
+      }
       const choice = res.choices[0];
       return {
         message: fromWireMessage(choice.message),
@@ -97,4 +117,21 @@ function fromWireMessage(m: WireResponseMessage): ChatMessage {
       arguments: tc.function.arguments,
     })),
   };
+}
+
+type CompletionBody = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+
+// "none" is newer than the ReasoningEffort union in this lockfile, and the
+// parameter is rejected outright by models that do not reason — hence the cast,
+// and hence sending it only once the API has asked for it.
+function withReasoningOff(body: CompletionBody, off: boolean): CompletionBody {
+  return off ? ({ ...body, reasoning_effort: "none" } as unknown as CompletionBody) : body;
+}
+
+// The one 400 worth retrying: the model can do tools, just not while reasoning.
+// Matched on the parameter it names rather than on wording, which vendors edit.
+function rejectsToolsWhileReasoning(err: unknown): boolean {
+  const e = err as { status?: number; param?: string; error?: { message?: string } };
+  if (e?.status !== 400) return false;
+  return e.param === "reasoning_effort" || Boolean(e.error?.message?.includes("reasoning_effort"));
 }
