@@ -36,6 +36,14 @@ export function stripMarkdown(text: string): string {
 // clip takes slightly longer, which is a fair trade against sounding erratic.
 const MIN_CHUNK_CHARS = 140;
 
+// The speak route refuses anything longer than 1200 characters, and a chunk is
+// only ever that long when the reply had no sentence endings to split on — a
+// table, a list, a wall of text. Rejected, it produced no sound at all, and a
+// patient cannot tell "the voice is broken" from "the voice is slow". Capping
+// here keeps the failure impossible rather than merely reported. Set below the
+// route's limit so the two can drift a little without meeting.
+const MAX_CHUNK_CHARS = 1000;
+
 export function splitSentences(text: string, minChars = MIN_CHUNK_CHARS): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
@@ -55,11 +63,27 @@ export function splitSentences(text: string, minChars = MIN_CHUNK_CHARS): string
   const tail = trimmed.slice(start).trim();
   if (tail) raw.push(tail);
 
-  return mergeShort(raw, minChars);
+  return mergeShort(raw, minChars).flatMap(capLength);
 }
 
 export function toSpeakable(text: string, minChars = MIN_CHUNK_CHARS): string[] {
   return splitSentences(stripMarkdown(text), minChars);
+}
+
+// Split at a space, so a word is never sawn in half and read as two.
+function capLength(chunk: string): string[] {
+  if (chunk.length <= MAX_CHUNK_CHARS) return [chunk];
+  const out: string[] = [];
+  let rest = chunk;
+  while (rest.length > MAX_CHUNK_CHARS) {
+    const window = rest.slice(0, MAX_CHUNK_CHARS);
+    const cut = window.lastIndexOf(" ");
+    const at = cut > MAX_CHUNK_CHARS / 2 ? cut : MAX_CHUNK_CHARS;
+    out.push(rest.slice(0, at).trim());
+    rest = rest.slice(at).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
 }
 
 function endsWithAbbreviation(chunk: string): boolean {

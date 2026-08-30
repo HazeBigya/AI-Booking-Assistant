@@ -44,6 +44,25 @@ describe("splitSentences", () => {
     expect(chunks.join(" ")).toBe(long.trim());
   });
 
+  // The speak route rejects anything past 1200 characters, and a reply with no
+  // sentence endings — a table, a list — merges into exactly that. Rejected, it
+  // produced no sound at all, which reads as a broken feature rather than a
+  // long one, so the oversized chunk is never sent in the first place.
+  it("caps a chunk that would be refused by the speak route", () => {
+    const wall = "kate has a gap tomorrow morning ".repeat(80).trim();
+    const chunks = splitSentences(wall);
+    expect(wall.length).toBeGreaterThan(1200);
+    for (const c of chunks) expect(c.length).toBeLessThanOrEqual(1000);
+  });
+
+  it("cuts at a space rather than through a word", () => {
+    const wall = "appointment ".repeat(200).trim();
+    for (const c of splitSentences(wall)) {
+      expect(c.startsWith("appointment")).toBe(true);
+      expect(c.endsWith("appointment")).toBe(true);
+    }
+  });
+
   // toSpeakable is what the browser actually calls, and it once carried its own
   // default — so the merge threshold was tuned in a function nothing used.
   it("applies the same merging through toSpeakable", () => {

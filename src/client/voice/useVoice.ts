@@ -12,9 +12,13 @@ interface Params {
   // turn produced nothing to say.
   onTranscript: (text: string) => Promise<string | null>;
   setState: (state: ConversationState) => void;
+  // Told when speech fails outright. The reply is on screen either way, so this
+  // is not fatal — but silence with no explanation reads as a broken product,
+  // and the patient has no way to tell it from a voice that is merely slow.
+  onError: (message: string) => void;
 }
 
-export function useVoice({ onTranscript, setState }: Params) {
+export function useVoice({ onTranscript, setState, onError }: Params) {
   const [disabledReason, setDisabledReason] = useState<string | null>("Checking voice…");
   const [listening, setListening] = useState(false);
   // The reply currently being turned into audio, so the message it belongs to
@@ -104,13 +108,19 @@ export function useVoice({ onTranscript, setState }: Params) {
         // Only tidy up if this run is still the current one. Anything else has
         // already set the state it wants and must not be overwritten.
         if (speechRun.current === run) {
+          const { played, failed } = queue.outcome();
+          // Losing a sentence is survivable; losing all of them is a reply the
+          // patient never heard, and nothing else would have told them.
+          if (played === 0 && failed > 0) {
+            onError("I couldn't read that reply out loud — it's written above.");
+          }
           queueRef.current = null;
           setSpokenText(null);
           setState("idle");
         }
       }
     },
-    [setState],
+    [onError, setState],
   );
 
   const toggle = useCallback(async () => {

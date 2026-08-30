@@ -8,6 +8,8 @@ export type PlayFn = (clip: Blob) => Promise<void>;
 export class PlaybackQueue {
   private readonly pending = new Map<number, Promise<Blob>>();
   private next = 0;
+  private played = 0;
+  private failed = 0;
   private draining: Promise<void> = Promise.resolve();
   private stopped = false;
 
@@ -32,6 +34,13 @@ export class PlaybackQueue {
     return this.draining;
   }
 
+  // Skipping a dead sentence keeps the rest of the reply alive, but skipping
+  // every sentence is a reply nobody heard — and from the patient's side that
+  // is indistinguishable from a voice that simply never arrived.
+  outcome(): { played: number; failed: number } {
+    return { played: this.played, failed: this.failed };
+  }
+
   stop(): void {
     this.stopped = true;
     this.pending.clear();
@@ -48,7 +57,9 @@ export class PlaybackQueue {
         const blob = await clip;
         if (this.stopped) return;
         await this.play(blob);
+        this.played++;
       } catch (err) {
+        this.failed++;
         // One dead sentence must not swallow the rest of the reply.
         console.warn("skipping unplayable sentence:", err instanceof Error ? err.message : err);
       }

@@ -89,4 +89,23 @@ describe("PlaybackQueue", () => {
     expect(interrupted).toBe(true);
     await expect(queue.whenDrained()).resolves.toBeUndefined();
   });
+
+  // A reply where every sentence failed is a reply nobody heard, and the text
+  // sitting on screen makes it look as though the voice simply never came.
+  // Nothing else in the pipeline would have told the patient.
+  it("reports that nothing was heard when every clip fails", async () => {
+    const queue = new PlaybackQueue(async () => {});
+    queue.enqueue(0, Promise.reject(new Error("413")));
+    queue.enqueue(1, Promise.reject(new Error("502")));
+    await queue.whenDrained();
+    expect(queue.outcome()).toEqual({ played: 0, failed: 2 });
+  });
+
+  it("counts a partial failure as partly heard", async () => {
+    const queue = new PlaybackQueue(async () => {});
+    queue.enqueue(0, Promise.resolve(new Blob(["one"])));
+    queue.enqueue(1, Promise.reject(new Error("502")));
+    await queue.whenDrained();
+    expect(queue.outcome()).toEqual({ played: 1, failed: 1 });
+  });
 });

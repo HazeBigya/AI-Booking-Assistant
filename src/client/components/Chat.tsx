@@ -96,7 +96,11 @@ export function Chat() {
   // through the same send() a typed message uses, and the reply comes back out
   // through TTS. The `spoken` flag travels with it so the reply is written to be
   // heard; everything between — tools, guards, the database — is identical.
-  const voice = useVoice({ setState, onTranscript: (text) => send(text, true) });
+  const voice = useVoice({
+    setState,
+    onTranscript: (text) => send(text, true),
+    onError: setError,
+  });
 
   return (
     <div className="flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row lg:overflow-hidden">
