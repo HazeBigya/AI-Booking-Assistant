@@ -63,4 +63,33 @@ describe("buildIcs", () => {
     const ics = buildIcs({ ...invite, summary: "A; B, C" });
     expect(ics).toContain("SUMMARY:A\\; B\\, C");
   });
+
+  // A booking and its later cancellation are told apart by three things, and a
+  // client that mishandles one of them shows the wrong event state. Pinned
+  // because "both invites arrived as cancellations" is otherwise unfalsifiable
+  // from the code: this is what leaves the building.
+  it("marks a new booking as a request for a confirmed event", () => {
+    const ics = buildIcs(invite);
+    expect(ics).toContain("METHOD:REQUEST");
+    expect(ics).toContain("STATUS:CONFIRMED");
+    expect(ics).toContain("SEQUENCE:0");
+    expect(ics).not.toContain("CANCEL");
+  });
+
+  it("marks a cancellation as one, at a higher sequence", () => {
+    const ics = buildIcs({ ...invite, method: "CANCEL", sequence: 1 });
+    expect(ics).toContain("METHOD:CANCEL");
+    expect(ics).toContain("STATUS:CANCELLED");
+    expect(ics).toContain("SEQUENCE:1");
+  });
+
+  // Clients match on UID, so a cancellation only removes the event it names.
+  // Sharing a UID between two bookings would let one cancel the other.
+  it("keeps a cancellation tied to the booking it belongs to", () => {
+    const cancel = buildIcs({ ...invite, uid: "booking-1@brightsmile", method: "CANCEL" });
+    const other = buildIcs({ ...invite, uid: "booking-2@brightsmile" });
+    expect(cancel).toContain("UID:booking-1@brightsmile");
+    expect(other).toContain("UID:booking-2@brightsmile");
+    expect(other).toContain("STATUS:CONFIRMED");
+  });
 });

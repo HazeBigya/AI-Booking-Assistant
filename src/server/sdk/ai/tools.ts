@@ -419,6 +419,7 @@ export async function runTool(
               ...(dentist ? [{ name: dentist.name, email: dentist.email }] : []),
             ],
           });
+          console.log(`[mail] sent REQUEST for booking ${result.booking.id}`);
         } catch (err) {
           console.error(`[mail] invite not sent: ${errText(err)}`);
         }
@@ -478,6 +479,7 @@ export async function runTool(
             ...(dentist ? [{ name: dentist.name, email: dentist.email }] : []),
           ],
         });
+        console.log(`[mail] sent CANCEL for booking ${cancelled.id}`);
       } catch (err) {
         console.error(`[mail] cancellation notice not sent: ${errText(err)}`);
       }
