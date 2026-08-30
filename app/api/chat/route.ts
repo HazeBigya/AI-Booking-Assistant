@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { chatController } from "@server/controllers/chat-controller";
 import { SESSION_COOKIE, createSessionToken, readSessionToken } from "@server/auth/session";
 import { CHAT_SESSION_COOKIE } from "@server/db/queries/chat";
+import { A_MONTH, A_WEEK, sessionCookie } from "@server/shared/cookies";
 
 export async function POST(req: NextRequest) {
   const clientKey = req.headers.get("x-forwarded-for") ?? "local";
@@ -26,12 +27,7 @@ export async function POST(req: NextRequest) {
 
   // Persist the chat session (anonymous conversation identity) so refresh keeps history.
   if (result.chatSessionId) {
-    res.cookies.set(CHAT_SESSION_COOKIE, result.chatSessionId, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    res.cookies.set(CHAT_SESSION_COOKIE, result.chatSessionId, sessionCookie(A_MONTH));
   }
 
   // Patient verified their email in-chat this turn -> persist the auth session.
@@ -40,12 +36,7 @@ export async function POST(req: NextRequest) {
       email: result.authenticateAs,
       name: result.authenticateAs.split("@")[0],
     });
-    res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    res.cookies.set(SESSION_COOKIE, token, sessionCookie(A_WEEK));
   }
 
   return res;
