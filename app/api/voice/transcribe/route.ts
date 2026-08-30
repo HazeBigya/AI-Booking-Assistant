@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { CHAT_SESSION_COOKIE } from "@server/db/queries/chat";
 import { getSpeechToText } from "@server/sdk/voice";
-import { getVoiceStore } from "@server/sdk/voice/store";
 
 // A minute of opus is roughly 250 KB; anything past this is not a spoken turn.
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -27,12 +25,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Recording too long." }, { status: 413 });
   }
 
+  // The bytes are transcribed and dropped. The transcript is persisted by the
+  // chat route as an ordinary message, which is the whole record of the turn —
+  // keeping the audio too would mean holding a patient's voice with no
+  // retention window and nothing in the product that ever reads it back.
   const bytes = new Uint8Array(await file.arrayBuffer());
   const mimeType = file.type || "audio/webm";
-
-  // Fire and forget: a debug artifact must not delay or fail the patient's turn.
-  const sessionId = req.cookies.get(CHAT_SESSION_COOKIE)?.value ?? "anonymous";
-  void getVoiceStore().save(sessionId, bytes, mimeType);
 
   try {
     const text = await stt.transcribe(bytes, mimeType);

@@ -73,17 +73,9 @@ services:
       VOICE_TTS_VOICE: ${VOICE_TTS_VOICE:-}
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
-      # Absolute, because the app's cwd inside the image is not the repo root
-      # and a relative path would put recordings somewhere surprising.
-      VOICE_SAVE_RECORDINGS: ${VOICE_SAVE_RECORDINGS:-}
-      VOICE_STORAGE_DIR: /app/storage/voice
       HOSTNAME: "0.0.0.0"
     ports:
       - "3000:3000"
-    volumes:
-      # Recordings are debug artifacts, but they are useless if they die with
-      # the container. Bind-mounted so they land in the gitignored ./storage.
-      - ./storage:/app/storage
 
 volumes:
   pgdata:

@@ -65,7 +65,7 @@ src/server/
   domain/booking/        PURE scheduling core — imports nothing external
   sdk/ai/                providers (LLM seam), tools + dispatch, loop, guardrails
   sdk/mailer/            email seam: console / SMTP / Resend, + .ics builder
-  sdk/voice/             speech seam: OpenAI / ElevenLabs / Deepgram, + recording store
+  sdk/voice/             speech seam: OpenAI / ElevenLabs / Deepgram
   auth/                  email-OTP, JWT session, find-or-create patient
   db/                    drizzle schema, migrations, queries, seed
   shared/                rate limiting
@@ -163,22 +163,41 @@ fed and the perceived gap drops to roughly 1.5 seconds. An indexed FIFO queue
 keeps playback in order — a short sentence returns from TTS before a long
 earlier one, so without it the reply would play back scrambled.
 
-**Recordings are not kept.** The transcript is already stored as an ordinary
-chat message, so keeping the audio too would add nothing the product uses —
-only a patient's voice on a disk with no retention policy and no deletion path.
-Set `VOICE_SAVE_RECORDINGS=1` and they land in `storage/voice/` (gitignored),
-which is worth doing while tuning the endpointing: replaying a bad turn
-separates a mic problem from a mishearing from a misreading. Nothing reads them
-back in the request path, so losing the directory loses nothing.
+**Recordings are never kept.** Audio is transcribed and dropped. The transcript
+is stored as an ordinary chat message and is the whole record of the turn, so
+holding the audio as well would add nothing the product reads back — only a
+patient's voice on a disk with no retention window and no deletion path.
+
+## Chat history
+
+Every message is stored, but only the **last 15** are sent to the model
+(`chat-service.ts`). That number is small on purpose.
+
+A general assistant needs a deep window because the conversation *is* the
+product. Here it is not: the booking is, and the booking lives in Postgres. A
+patient who asks "when is my appointment?" thirty turns later is answered by
+`list_my_appointments` reading the database — not by the model recalling the
+transcript. Identity persists the same way, in the session cookie and
+`chat_sessions.patient_id`. **Tools are the memory; the transcript only carries
+recent phrasing.**
+
+So a longer window buys nothing and costs twice: more tokens on every turn, and
+more surrounding text for a weak model to lose the auth line in — the failure
+this codebase already works to prevent by repeating that line first and last.
+
+Tool results are never persisted, so 15 rows means 15 real exchanges, not 15
+slots half-consumed by a booking flow. The full transcript is still returned to
+the browser by `/api/chat/history`, which is what repopulates the window on
+reload; only what the *model* sees is trimmed.
 
 ## Tests
 
 ```bash
-npm test        # 119 tests: pure booking core, clinic-timezone conversion,
+npm test        # 127 tests: pure booking core, clinic-timezone conversion,
                 # tool-dispatch guards, the fabricated-confirmation guard,
                 # provider config resolution, .ics builder, fallback chain,
-                # rate limiter, output validator, and the voice layer
-                # (sentence splitting, provider resolution, recording store,
+                # rate limiter, output validator, tool-payload redaction, and
+                # the voice layer (sentence splitting, provider resolution,
                 # silence detection, playback ordering)
 ```
 
@@ -217,7 +236,7 @@ resolution and sequencing without touching the network.
   ~800ms of silence. Full-duplex barge-in — interrupting the bot mid-sentence,
   as the ElevenLabs demo does — needs bidirectional streaming and cancellation
   threaded through the tool loop, and is not built.
-- Voice selection is one env var, not an in-app picker; recordings are off by
-  default and, when enabled, are written to local disk behind a `VoiceStore`
-  interface, so S3 is a swap rather than a rewrite. A real deployment that kept
-  them would also need a retention window and a per-patient deletion path.
+- Voice selection is one env var, not an in-app picker.
+- The model sees the last 15 messages, not the whole conversation. Durable state
+  lives in Postgres and is fetched by tools, so the transcript only has to carry
+  recent phrasing — see Chat history below.

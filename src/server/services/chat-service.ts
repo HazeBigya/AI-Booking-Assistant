@@ -12,7 +12,12 @@ import { findOrCreatePatient } from "@server/auth/patients";
 import { CLINIC } from "@server/domain/booking/rules";
 import { formatZonedDate, formatZonedTime, zonedDateKey } from "@server/domain/booking/timezone";
 
-const CONTEXT_WINDOW = 15; // recent messages sent to the model
+// Recent messages sent to the model. Deliberately short: the durable state of a
+// booking lives in Postgres, not in the transcript, so a fact from forty turns
+// ago is re-read by a tool rather than remembered. That makes a longer window
+// pure cost — more tokens per turn, and more text for a weak model to lose the
+// auth line in. Tool results are not persisted, so this is 15 real exchanges.
+const CONTEXT_WINDOW = 15;
 
 export interface ChatReply {
   reply: string;
