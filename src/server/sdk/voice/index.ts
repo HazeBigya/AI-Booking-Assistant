@@ -1,6 +1,7 @@
 import { createDeepgramSTT, createDeepgramTTS } from "./deepgram";
 import { createElevenLabsSTT, createElevenLabsTTS } from "./elevenlabs";
 import { createOpenAISTT, createOpenAITTS } from "./openai";
+import { OPENAI_TTS_MODEL } from "./persona";
 import type { SpeechToText, TextToSpeech } from "./types";
 
 export type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
@@ -56,7 +57,8 @@ export const TTS_VENDORS: Record<string, VoiceVendor> = {
     label: "OpenAI",
     keyEnv: "OPENAI_API_KEY",
     modelEnv: "VOICE_TTS_MODEL",
-    defaultModel: "gpt-4o-mini-tts",
+    // Chosen with the voice, not separately — see persona.ts.
+    defaultModel: OPENAI_TTS_MODEL,
   },
   elevenlabs: {
     label: "ElevenLabs",

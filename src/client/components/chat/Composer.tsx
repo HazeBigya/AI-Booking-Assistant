@@ -124,22 +124,15 @@ export function Composer({
         aria-label={listening ? "Stop recording and send" : "Send message"}
         title={listening ? "Stop and send" : undefined}
         className={
-          "flex h-11 shrink-0 items-center justify-center gap-2 rounded-full text-sm " +
-          "font-medium transition duration-300 ease-glide hover:-translate-y-px " +
-          "active:translate-y-0 active:scale-[0.94] disabled:pointer-events-none " +
-          "disabled:bg-zinc-200 disabled:text-zinc-400 " +
-          (listening
-            ? "w-auto bg-accent-600 px-4 text-white shadow-diffuse"
-            : "w-11 bg-ink text-zinc-50")
+          "grid h-11 w-11 shrink-0 place-items-center rounded-full transition " +
+          "duration-300 ease-glide hover:-translate-y-px active:translate-y-0 " +
+          "active:scale-[0.94] disabled:pointer-events-none disabled:bg-zinc-200 " +
+          "disabled:text-zinc-400 " +
+          (listening ? "bg-accent-600 text-white shadow-diffuse" : "bg-ink text-zinc-50")
         }
       >
         {listening ? (
-          <>
-            <span className="grid h-5 w-5 place-items-center">
-              <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
-            </span>
-            Stop
-          </>
+          <span className="h-3 w-3 rounded-[3px] bg-current" />
         ) : (
           <svg
             viewBox="0 0 24 24"

@@ -1,42 +1,34 @@
 import { describe, expect, it } from "vitest";
+import { TTS_VENDORS } from "@server/sdk/voice";
 import {
   ELEVENLABS_VOICE_SETTINGS,
-  SPEAKING_RATE,
-  SPEAKING_STYLE,
+  OPENAI_TTS_MODEL,
+  OPENAI_VOICE,
 } from "@server/sdk/voice/persona";
 
-// The clinic has one receptionist. Each vendor expresses her differently —
-// OpenAI reads a sentence of direction, ElevenLabs reads numbers — so the risk
-// is not that either is wrong but that they quietly drift into two people.
+// The clinic has one receptionist, and on OpenAI she is a model and a voice
+// together rather than either alone: the newer models render nova as
+// authoritative instead of friendly, which is the opposite of what a patient
+// ringing a dentist needs. Settled by listening, so these guard the result
+// against someone later "upgrading" the model on paper.
 describe("the clinic's voice", () => {
-  it("asks OpenAI for the receptionist the brief wanted", () => {
-    expect(SPEAKING_STYLE).toMatch(/warm/i);
-    expect(SPEAKING_STYLE).toMatch(/female/i);
-    expect(SPEAKING_STYLE).toMatch(/receptionist/i);
+  it("keeps the model the voice was chosen with", () => {
+    expect(OPENAI_TTS_MODEL).toBe("tts-1");
+    expect(OPENAI_VOICE).toBe("nova");
   });
 
-  // Speed is the first thing that turns a helpful voice into an impatient one,
-  // which is why this is pinned rather than left to taste.
-  it("never rushes the patient", () => {
-    expect(SPEAKING_RATE).toBeLessThanOrEqual(1);
-    expect(SPEAKING_RATE).toBeGreaterThanOrEqual(0.85);
-  });
-
-  // Asserting positively, because the direction names hurriedness in order to
-  // forbid it — a banned-word check cannot tell "be efficient" from "never
-  // sound efficient", and would have failed the very sentence that fixed this.
-  it("asks for someone with time for the patient", () => {
-    expect(SPEAKING_STYLE).toMatch(/patient rather than efficient|has time for them/i);
-    expect(SPEAKING_STYLE).toMatch(/relaxed|unhurried/i);
-  });
-
-  it("hands ElevenLabs the same pace rather than a second opinion", () => {
-    expect(ELEVENLABS_VOICE_SETTINGS.speed).toBe(SPEAKING_RATE);
+  it("is what the registry actually reaches for by default", () => {
+    expect(TTS_VENDORS.openai.defaultModel).toBe(OPENAI_TTS_MODEL);
   });
 
   // Fully stable is what makes a good voice sound recited.
   it("leaves ElevenLabs room to vary its delivery", () => {
     expect(ELEVENLABS_VOICE_SETTINGS.stability).toBeLessThan(0.6);
     expect(ELEVENLABS_VOICE_SETTINGS.stability).toBeGreaterThan(0.2);
+  });
+
+  // Every attempt to speed her up read as impatience, so there is no dial.
+  it("does not hurry her", () => {
+    expect(ELEVENLABS_VOICE_SETTINGS).not.toHaveProperty("speed");
   });
 });

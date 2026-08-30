@@ -39,11 +39,16 @@ export interface ChatTurnOptions {
 // problem, and both are fixed by asking for prose.
 const SPOKEN_STYLE =
   `The patient is SPEAKING to you and will HEAR your reply — they are not reading it. ` +
-  `Write for the ear: short plain sentences, no tables, no bullet points, no markdown, ` +
-  `no headings. Never read out a long list; name two or three options and offer the rest. ` +
-  `Say numbers as a person says them ("fifty dollars", "an hour and a half", "quarter past ` +
-  `two"). Keep it under about sixty words unless they asked for detail. This changes only ` +
-  `how you speak — the tools you call and the facts you may state are exactly the same.`;
+  `Talk to them the way a good receptionist talks across the desk: plain sentences, no ` +
+  `tables, no bullet points, no markdown, no headings. Say numbers as a person says them ` +
+  `("fifty dollars", "an hour and a half", "quarter past two"). ` +
+  `Answer as fully as the question deserves — a small question gets a sentence, and a real ` +
+  `question like "what do you offer?" gets a proper answer covering everything they asked ` +
+  `about, just spoken rather than tabulated. Do not clip a full answer down to a token one; ` +
+  `a receptionist who says almost nothing sounds like she does not want to help. When a ` +
+  `list really is long, walk through it naturally in prose and finish by asking what they ` +
+  `would like to hear more about. This changes only how you speak — the tools you call and ` +
+  `the facts you may state are exactly the same.`;
 
 // Server-authoritative: history from the DB, guarded tool loop, turn persisted.
 export async function handleChat(

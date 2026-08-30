@@ -1,6 +1,6 @@
 import OpenAI, { toFile } from "openai";
 import { extensionFor } from "./mime";
-import { OPENAI_VOICE, SPEAKING_RATE, SPEAKING_STYLE } from "./persona";
+import { OPENAI_VOICE } from "./persona";
 import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
 
 export interface OpenAIVoiceConfig {
@@ -35,10 +35,6 @@ export function createOpenAITTS(cfg: OpenAIVoiceConfig): TextToSpeech {
         // faster than the types do, and the model rejects a bad name anyway.
         voice: OPENAI_VOICE as never,
         input: text,
-        speed: SPEAKING_RATE,
-        // Only the gpt-4o speech models take delivery direction. Sending it to
-        // tts-1 would be rejected, so the older models simply go without.
-        ...(cfg.model.startsWith("gpt-4o") ? { instructions: SPEAKING_STYLE } : {}),
       });
       return { audio: new Uint8Array(await res.arrayBuffer()), mimeType: "audio/mpeg" };
     },
