@@ -60,7 +60,7 @@ export function Chat() {
     setState("idle");
   }
 
-  async function send(text: string = input): Promise<string | null> {
+  async function send(text: string = input, spoken = false): Promise<string | null> {
     const body = text.trim();
     if (!body || sending.current) return null;
     sending.current = true;
@@ -71,7 +71,7 @@ export function Chat() {
     setError(null);
     setState("thinking");
     try {
-      const { reply } = await sendChat(body); // the server holds the history
+      const { reply } = await sendChat(body, spoken); // the server holds the history
       setMessages([...next, { role: "assistant", content: reply }]);
       refreshSession(); // they may have just verified their email in-chat
       return reply;
@@ -86,8 +86,9 @@ export function Chat() {
 
   // Voice is bookends around the unchanged text pipeline: a transcript goes in
   // through the same send() a typed message uses, and the reply comes back out
-  // through TTS. Nothing in between knows which one happened.
-  const voice = useVoice({ setState, onTranscript: (text) => send(text) });
+  // through TTS. The `spoken` flag travels with it so the reply is written to be
+  // heard; everything between — tools, guards, the database — is identical.
+  const voice = useVoice({ setState, onTranscript: (text) => send(text, true) });
 
   return (
     <div className="flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row lg:overflow-hidden">

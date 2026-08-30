@@ -25,12 +25,31 @@ export interface ChatReply {
   authenticateAs?: string;
 }
 
+export interface ChatTurnOptions {
+  authedEmail?: string;
+  patientTimeZone?: string;
+  spoken?: boolean; // the patient will hear this reply, not read it
+}
+
+// A reply that will be heard has to be written for the ear. The same table that
+// reads well on screen becomes a list of numbers read aloud, and — because
+// sentence-level chunking is what keeps speech latency down — a block with no
+// sentence endings is also synthesised as one long request, so the patient
+// waits through all of it before hearing a word. Both problems are the same
+// problem, and both are fixed by asking for prose.
+const SPOKEN_STYLE =
+  `The patient is SPEAKING to you and will HEAR your reply — they are not reading it. ` +
+  `Write for the ear: short plain sentences, no tables, no bullet points, no markdown, ` +
+  `no headings. Never read out a long list; name two or three options and offer the rest. ` +
+  `Say numbers as a person says them ("fifty dollars", "an hour and a half", "quarter past ` +
+  `two"). Keep it under about sixty words unless they asked for detail. This changes only ` +
+  `how you speak — the tools you call and the facts you may state are exactly the same.`;
+
 // Server-authoritative: history from the DB, guarded tool loop, turn persisted.
 export async function handleChat(
   sessionId: string,
   userMessage: string,
-  authedEmail?: string,
-  patientTimeZone?: string,
+  { authedEmail, patientTimeZone, spoken }: ChatTurnOptions = {},
 ): Promise<ChatReply> {
   const authLine = authedEmail
     ? `The patient is ALREADY logged in and verified as ${authedEmail}. Treat them as ` +
@@ -46,7 +65,10 @@ export async function handleChat(
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `${authLine}\n\n${SYSTEM_PROMPT}\n\n${currentDateLine(patientTimeZone)}\n${authLine}`,
+      content:
+        `${authLine}\n\n${SYSTEM_PROMPT}\n\n${currentDateLine(patientTimeZone)}\n${authLine}` +
+        // Last, so recency works for it the way it does for the auth line.
+        (spoken ? `\n\n${SPOKEN_STYLE}` : ""),
     },
     ...history,
     { role: "user", content: userMessage },

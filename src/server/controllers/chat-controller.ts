@@ -28,12 +28,11 @@ export async function chatController(input: {
   const sessionId = await getOrCreateChatSession(input.chatSessionId);
 
   try {
-    const { reply, totalTokens, authenticateAs } = await handleChat(
-      sessionId,
-      message,
-      input.authedEmail,
-      parseTimeZone(input.payload),
-    );
+    const { reply, totalTokens, authenticateAs } = await handleChat(sessionId, message, {
+      authedEmail: input.authedEmail,
+      patientTimeZone: parseTimeZone(input.payload),
+      spoken: parseSpoken(input.payload),
+    });
     return { status: 200, body: { reply, totalTokens }, authenticateAs, chatSessionId: sessionId };
   } catch (err) {
     console.error("chat error:", err);
@@ -46,6 +45,14 @@ function parseMessage(payload: unknown): string | null {
   const { message } = payload as { message?: unknown };
   if (typeof message !== "string" || message.trim() === "") return null;
   return message;
+}
+
+// Only ever a style hint. A caller who lies about this gets prose instead of a
+// table and nothing else: it reaches the system prompt, never the tool layer,
+// so it cannot widen what the model is allowed to do or say.
+export function parseSpoken(payload: unknown): boolean {
+  if (typeof payload !== "object" || payload === null) return false;
+  return (payload as { spoken?: unknown }).spoken === true;
 }
 
 // Client input: validated against the platform's tz database before use.
