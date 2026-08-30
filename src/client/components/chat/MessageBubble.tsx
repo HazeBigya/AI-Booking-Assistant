@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatTurn } from "@client/api/chat";
@@ -9,27 +6,21 @@ export function MessageBubble({
   turn,
   index,
   onSpeak,
+  speaking,
 }: {
   turn: ChatTurn;
   index: number;
   // Absent when voice is not configured, which is also why the control is not
   // rendered at all rather than rendered disabled: a button nobody can use is
-  // just an unanswered question about why. Resolves when the reply has finished
-  // being spoken, which is what drives the control's own busy state.
-  onSpeak?: () => Promise<void>;
+  // just an unanswered question about why.
+  onSpeak?: () => void;
+  // True from the moment this reply starts being turned into audio until the
+  // last sentence has played. Owned by the voice hook rather than by this
+  // component, so a reply spoken by the microphone shows it too — not only one
+  // the reader started by pressing Listen.
+  speaking?: boolean;
 }) {
   const mine = turn.role === "user";
-  const [speaking, setSpeaking] = useState(false);
-
-  async function handleSpeak() {
-    if (!onSpeak || speaking) return;
-    setSpeaking(true);
-    try {
-      await onSpeak();
-    } finally {
-      setSpeaking(false);
-    }
-  }
 
   return (
     <div
@@ -62,7 +53,7 @@ export function MessageBubble({
             {onSpeak && (
               <button
                 type="button"
-                onClick={handleSpeak}
+                onClick={onSpeak}
                 aria-busy={speaking}
                 aria-label="Read this reply aloud"
                 title="Read aloud"

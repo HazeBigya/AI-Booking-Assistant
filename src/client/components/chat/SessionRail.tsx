@@ -8,9 +8,8 @@ import type { ConversationState } from "./types";
 const STATUS: Record<ConversationState, string> = {
   idle: "Ready",
   listening: "Listening",
-  // Covers the model call and the wait for the first audio clip: both are the
-  // assistant working, and a patient does not care which half they are in.
   thinking: "Working on it",
+  preparing: "Getting her voice ready",
   speaking: "Speaking",
 };
 

@@ -17,6 +17,11 @@ interface Params {
 export function useVoice({ onTranscript, setState }: Params) {
   const [disabledReason, setDisabledReason] = useState<string | null>("Checking voice…");
   const [listening, setListening] = useState(false);
+  // The reply currently being turned into audio, so the message it belongs to
+  // can show that it is working. Matching on the text rather than an index keeps
+  // this right whether the speech was started by the microphone or by pressing
+  // Listen on an older reply.
+  const [spokenText, setSpokenText] = useState<string | null>(null);
   const captureRef = useRef<Capture | null>(null);
   const queueRef = useRef<PlaybackQueue | null>(null);
 
@@ -52,19 +57,25 @@ export function useVoice({ onTranscript, setState }: Params) {
       const sentences = toSpeakable(reply);
       if (sentences.length === 0) return;
 
-      // Stay on 'thinking' until sound actually arrives. Announcing 'speaking'
-      // at the top of this function was a lie for as long as the first clip
-      // took to synthesise — seconds of silence under a label claiming audio,
-      // which reads as a hang rather than as work in progress.
+      // 'preparing' until sound actually arrives, then 'speaking'. Announcing
+      // 'speaking' up front was a lie for as long as the first clip took to
+      // synthesise, and leaving it on 'idle' was worse — the app claimed to be
+      // ready while the patient sat through silence wondering if it had heard.
+      setState("preparing");
+      setSpokenText(reply);
       const queue = new PlaybackQueue(async (clip) => {
         setState("speaking");
         await playBlob(clip);
       });
       queueRef.current = queue;
       sentences.forEach((sentence, i) => queue.enqueue(i, speak(sentence)));
-      await queue.whenDrained();
-      queueRef.current = null;
-      setState("idle");
+      try {
+        await queue.whenDrained();
+      } finally {
+        queueRef.current = null;
+        setSpokenText(null);
+        setState("idle");
+      }
     },
     [setState],
   );
@@ -124,7 +135,7 @@ export function useVoice({ onTranscript, setState }: Params) {
     [speakReply],
   );
 
-  return { disabledReason, listening, toggle, speakText };
+  return { disabledReason, listening, toggle, speakText, spokenText };
 }
 
 function playBlob(clip: Blob): Promise<void> {

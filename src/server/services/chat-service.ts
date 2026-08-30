@@ -49,7 +49,11 @@ const SPOKEN_STYLE =
   `a receptionist who says almost nothing sounds like she does not want to help. When a ` +
   `list really is long, walk through it naturally in prose and finish by asking what they ` +
   `would like to hear more about. This changes only how you speak — the tools you call and ` +
-  `the facts you may state are exactly the same.`;
+  `the facts you may state are exactly the same. ` +
+  `One exception, because speech makes it necessary: before calling request_login_code, read ` +
+  `the email address back and wait for them to confirm it. A misheard address cannot be ` +
+  `detected later — the code simply never arrives, and the patient cannot tell that from a ` +
+  `slow one.`;
 
 // Server-authoritative: history from the DB, guarded tool loop, turn persisted.
 export async function handleChat(
