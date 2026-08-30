@@ -105,6 +105,9 @@ export function useVoice({ onTranscript, setState }: Params) {
   const speakText = useCallback(
     async (text: string) => {
       queueRef.current?.stop(); // a second tap replaces the reply in flight
+      // Deliberately does not set the global 'thinking' state: that disables the
+      // composer, and replaying an old reply must not stop someone typing the
+      // next question. The button spins on its own instead.
       await speakReply(text);
     },
     [speakReply],

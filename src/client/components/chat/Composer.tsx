@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { VoiceOrb } from "./VoiceOrb";
 import type { ConversationState } from "./types";
 
 const MAX_HEIGHT = 160; // px, matches max-h-40
@@ -51,29 +50,40 @@ export function Composer({
         (listening ? "border-accent-600/40 ring-4 ring-accent-400/10" : "border-zinc-200")
       }
     >
+      {/* At rest this has to read as a button. A bare grey glyph beside a solid
+          black Send disappears, and a patient who never notices the microphone
+          never learns the product can be spoken to. While recording it becomes
+          an explicit, labelled Stop: silence ends the turn eventually, but
+          nobody should have to discover that by waiting. */}
       <button
         type="button"
         onClick={onToggleVoice}
         disabled={Boolean(voiceDisabledReason)}
-        title={voiceDisabledReason ?? undefined}
+        title={voiceDisabledReason ?? (listening ? "Stop and send" : "Speak instead of typing")}
         aria-pressed={listening}
-        aria-label={voiceDisabledReason ?? (listening ? "Stop voice input" : "Start voice input")}
+        aria-label={voiceDisabledReason ?? (listening ? "Stop recording and send" : "Speak")}
         className={
-          "grid h-11 w-11 shrink-0 place-items-center rounded-full transition duration-300 ease-glide " +
-          "active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40 " +
-          "disabled:hover:bg-transparent disabled:active:scale-100 " +
+          "flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border " +
+          "text-sm font-medium transition duration-300 ease-glide active:scale-[0.94] " +
+          "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 " +
           (listening
-            ? "bg-accent-50 text-accent-700"
-            : "text-ink-faint hover:bg-zinc-100 hover:text-ink-soft")
+            ? "w-auto border-accent-600 bg-accent-600 px-4 text-white shadow-diffuse"
+            : "w-11 border-zinc-200 bg-zinc-50 text-ink-soft hover:border-zinc-300 " +
+              "hover:bg-zinc-100 hover:text-ink")
         }
       >
         {listening ? (
-          <VoiceOrb state="listening" />
+          <>
+            <span className="grid h-5 w-5 place-items-center">
+              <span className="h-2.5 w-2.5 rounded-[2px] bg-current" />
+            </span>
+            Stop
+          </>
         ) : (
           <svg
             viewBox="0 0 24 24"
             fill="none"
-            strokeWidth={1.5}
+            strokeWidth={1.7}
             className="h-5 w-5"
             aria-hidden="true"
           >

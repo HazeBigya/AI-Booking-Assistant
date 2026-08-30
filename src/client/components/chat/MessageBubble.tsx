@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatTurn } from "@client/api/chat";
@@ -10,11 +13,23 @@ export function MessageBubble({
   turn: ChatTurn;
   index: number;
   // Absent when voice is not configured, which is also why the control is not
-  // rendered at all rather than rendered disabled: an button nobody can use is
-  // just an unanswered question about why.
-  onSpeak?: () => void;
+  // rendered at all rather than rendered disabled: a button nobody can use is
+  // just an unanswered question about why. Resolves when the reply has finished
+  // being spoken, which is what drives the control's own busy state.
+  onSpeak?: () => Promise<void>;
 }) {
   const mine = turn.role === "user";
+  const [speaking, setSpeaking] = useState(false);
+
+  async function handleSpeak() {
+    if (!onSpeak || speaking) return;
+    setSpeaking(true);
+    try {
+      await onSpeak();
+    } finally {
+      setSpeaking(false);
+    }
+  }
 
   return (
     <div
@@ -47,17 +62,22 @@ export function MessageBubble({
             {onSpeak && (
               <button
                 type="button"
-                onClick={onSpeak}
+                onClick={handleSpeak}
+                aria-busy={speaking}
                 aria-label="Read this reply aloud"
                 title="Read aloud"
-                className="mt-2.5 -ml-1.5 flex items-center gap-1.5 rounded-lg border
-                  border-zinc-200/80 px-2.5 py-1 text-xs font-medium text-ink-soft
-                  transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-ink
-                  focus-visible:outline-2 focus-visible:outline-offset-2
-                  focus-visible:outline-accent-600"
+                className={
+                  "mt-2.5 -ml-1.5 flex items-center gap-1.5 rounded-lg border px-2.5 py-1 " +
+                  "text-xs font-medium transition focus-visible:outline-2 " +
+                  "focus-visible:outline-offset-2 focus-visible:outline-accent-600 " +
+                  (speaking
+                    ? "border-accent-600/30 bg-accent-50 text-accent-700"
+                    : "border-zinc-200/80 text-ink-soft hover:border-zinc-300 " +
+                      "hover:bg-zinc-50 hover:text-ink")
+                }
               >
-                <SpeakerIcon />
-                Listen
+                {speaking ? <SpinnerIcon /> : <SpeakerIcon />}
+                {speaking ? "Reading aloud…" : "Listen"}
               </button>
             )}
           </>
@@ -82,6 +102,31 @@ function SpeakerIcon() {
       <path d="M11 5 6 9H3v6h3l5 4V5Z" />
       <path d="M15.5 8.5a5 5 0 0 1 0 7" />
       <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </svg>
+  );
+}
+
+// Spins from the tap until the last sentence has finished playing, so the wait
+// while the first clip is synthesised does not look like a dead button.
+function SpinnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 animate-spin" aria-hidden="true">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        opacity="0.25"
+      />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
