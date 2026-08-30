@@ -20,11 +20,36 @@ describe("stripMarkdown", () => {
 });
 
 describe("splitSentences", () => {
+  // minChars is passed explicitly here so these assert where the boundaries are.
+  // The default merges far past them on purpose — see the prosody tests below.
   it("splits on sentence terminators", () => {
-    expect(splitSentences("Kate is free from 11:30. Want me to book it?")).toEqual([
+    expect(splitSentences("Kate is free from 11:30. Want me to book it?", 1)).toEqual([
       "Kate is free from 11:30.",
       "Want me to book it?",
     ]);
+  });
+
+  // Each chunk is its own TTS request and the model has no memory of the last
+  // one, so it re-picks its pace every time. Six short sentences came back
+  // sounding like six different people; merging is what makes it one.
+  it("merges short sentences into one chunk by default", () => {
+    const reply = "Kate does both. She's free at 9. It ends at 10. Shall I book it?";
+    expect(splitSentences(reply)).toEqual([reply]);
+  });
+
+  it("still breaks a long reply so the first clip is not the whole thing", () => {
+    const long = `${"Kate has a gap in the diary tomorrow morning at nine. ".repeat(9)}Shall I take it?`;
+    const chunks = splitSentences(long);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.join(" ")).toBe(long.trim());
+  });
+
+  // toSpeakable is what the browser actually calls, and it once carried its own
+  // default — so the merge threshold was tuned in a function nothing used.
+  it("applies the same merging through toSpeakable", () => {
+    const reply = "Kate does both. She's free at 9. It ends at 10.";
+    expect(toSpeakable(reply)).toEqual(splitSentences(reply));
+    expect(toSpeakable(reply)).toHaveLength(1);
   });
 
   // The whole reason this is not a one-line regex.
@@ -64,7 +89,8 @@ describe("splitSentences", () => {
 
 describe("toSpeakable", () => {
   it("strips then splits", () => {
-    expect(toSpeakable("**Kate** is free at 11:30. Shall I book it?")).toEqual([
+    // minChars of 1 to see the boundaries; the default would merge these two.
+    expect(toSpeakable("**Kate** is free at 11:30. Shall I book it?", 1)).toEqual([
       "Kate is free at 11:30.",
       "Shall I book it?",
     ]);

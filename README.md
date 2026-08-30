@@ -124,7 +124,7 @@ Three models in a chain, and only the middle one thinks:
 |---|---|---|---|
 | Ears | audio → text | STT (`whisper-1` by default) | no |
 | Brain | text → reply + tool calls | **the existing chat loop, unchanged** | yes |
-| Mouth | text → audio | TTS (`tts-1`, voice `nova`, by default) | no |
+| Mouth | text → audio | TTS (`tts-1-hd`, voice `shimmer`, by default) | no |
 
 The speech models never see a tool schema, never touch the database, and never
 decide anything. STT turns a recording into the same string the text box would

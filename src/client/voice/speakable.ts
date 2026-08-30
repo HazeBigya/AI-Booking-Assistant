@@ -27,7 +27,16 @@ export function stripMarkdown(text: string): string {
     .trim();
 }
 
-export function splitSentences(text: string, minChars = 12): string[] {
+// Chunks are merged up to roughly this length before being sent to TTS. It is
+// not about latency — it is about prosody. Each chunk is a separate request, and
+// a speech model has no memory of the clip before, so it re-picks its pace every
+// time: a reply split into six short sentences comes back sounding like six
+// different people, speeding up and slowing down at random. Fewer, fuller chunks
+// give it enough text to settle into one delivery. The cost is that the first
+// clip takes slightly longer, which is a fair trade against sounding erratic.
+const MIN_CHUNK_CHARS = 140;
+
+export function splitSentences(text: string, minChars = MIN_CHUNK_CHARS): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
@@ -49,7 +58,7 @@ export function splitSentences(text: string, minChars = 12): string[] {
   return mergeShort(raw, minChars);
 }
 
-export function toSpeakable(text: string, minChars = 12): string[] {
+export function toSpeakable(text: string, minChars = MIN_CHUNK_CHARS): string[] {
   return splitSentences(stripMarkdown(text), minChars);
 }
 

@@ -7,14 +7,13 @@ import {
 } from "@server/sdk/voice/persona";
 
 // The clinic has one receptionist, and on OpenAI she is a model and a voice
-// together rather than either alone: the newer models render nova as
-// authoritative instead of friendly, which is the opposite of what a patient
-// ringing a dentist needs. Settled by listening, so these guard the result
-// against someone later "upgrading" the model on paper.
+// together rather than either alone — the two interact, and the pairing was
+// settled by listening to it. These guard that result against someone later
+// changing one half of it on paper.
 describe("the clinic's voice", () => {
   it("keeps the model the voice was chosen with", () => {
-    expect(OPENAI_TTS_MODEL).toBe("tts-1");
-    expect(OPENAI_VOICE).toBe("nova");
+    expect(OPENAI_TTS_MODEL).toBe("tts-1-hd");
+    expect(OPENAI_VOICE).toBe("shimmer");
   });
 
   it("is what the registry actually reaches for by default", () => {

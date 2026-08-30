@@ -11,12 +11,18 @@
 // decision, like its opening hours, not something that differs between
 // deployments — and offering it as a setting would mean nobody ever chose.
 
-// Model and voice are one choice, not two: nova on tts-1 is the combination
-// that was picked, and tts-1-hd renders the same voice as authoritative rather
-// than friendly. Changing either changes who answers the phone. Also the
-// cheapest of the three, which is a coincidence rather than a reason.
-export const OPENAI_TTS_MODEL = "tts-1";
-export const OPENAI_VOICE = "nova";
+// Model and voice are one choice, not two, and they interact: nova turns cold
+// and authoritative on tts-1-hd while sounding fine on tts-1, and shimmer is the
+// opposite — the extra fidelity is what carries its brightness. So neither of
+// these is independently "the good one", and swapping either alone changes who
+// answers the phone. Both were picked by listening to the pairs.
+export const OPENAI_TTS_MODEL = "tts-1-hd";
+
+// shimmer over nova. Nova is warm but level, and level across a front desk reads
+// as indifferent; shimmer is bright and glad you called, which is the difference
+// between a receptionist people tolerate and one they want to talk to. tts-1-hd
+// has no direction field, so the voice carries the entire personality.
+export const OPENAI_VOICE = "shimmer";
 
 // 'Rachel' — a warm female stock voice present on every ElevenLabs account, so
 // the connector matches the same receptionist without anyone browsing a library.
