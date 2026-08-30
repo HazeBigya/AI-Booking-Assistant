@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getSpeechToText, getTextToSpeech, resetVoiceCache, voiceStatus } from "@server/sdk/voice";
 
 const TOUCHED = [
+  "VOICE_PROVIDER",
   "VOICE_STT_PROVIDER",
   "VOICE_TTS_PROVIDER",
   "OPENAI_API_KEY",
@@ -52,6 +53,32 @@ describe("voice provider resolution", () => {
   it("refuses browser as a TTS provider", () => {
     process.env.VOICE_TTS_PROVIDER = "browser";
     expect(() => getTextToSpeech()).toThrowError(/browser/);
+  });
+
+  // One vendor sells both halves, so one var should be enough to say so.
+  it("lets VOICE_PROVIDER set both sides at once", () => {
+    process.env.VOICE_PROVIDER = "deepgram";
+    process.env.DEEPGRAM_API_KEY = "dg-test";
+    expect(getSpeechToText().name).toBe("deepgram");
+    expect(getTextToSpeech().name).toBe("deepgram");
+  });
+
+  it("lets a per-side var override VOICE_PROVIDER", () => {
+    process.env.VOICE_PROVIDER = "deepgram";
+    process.env.DEEPGRAM_API_KEY = "dg-test";
+    process.env.VOICE_TTS_PROVIDER = "elevenlabs";
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    expect(getSpeechToText().name).toBe("deepgram");
+    expect(getTextToSpeech().name).toBe("elevenlabs");
+  });
+
+  // elevenlabs speaks but does not listen here, so the shared var cannot
+  // resolve the STT half. The error has to name the way out.
+  it("points at the per-side var when a shared vendor covers only one half", () => {
+    process.env.VOICE_PROVIDER = "elevenlabs";
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    expect(getTextToSpeech().name).toBe("elevenlabs");
+    expect(() => getSpeechToText()).toThrowError(/VOICE_STT_PROVIDER/);
   });
 
   it("resolves the two sides independently", () => {

@@ -14,6 +14,10 @@ interface VoiceVendor {
 
 // Two independent choices, because STT and TTS are separate products with
 // separate prices, and because the chat vendor (AI_PROVIDER) may sell neither.
+// VOICE_PROVIDER sets both at once for the common case where one vendor sells
+// both; the per-side vars override it, because the tables below are not
+// symmetric — elevenlabs speaks but does not listen, browser listens but does
+// not speak.
 //
 // Model ids drift between releases, so every default has an env override and
 // nothing here is a hardcoded constant.
@@ -74,8 +78,8 @@ export function resetVoiceCache(): void {
 
 export function getSpeechToText(): SpeechToText {
   if (sttCache) return sttCache;
-  const name = env("VOICE_STT_PROVIDER") ?? "openai";
-  const vendor = pick(STT_VENDORS, name, "VOICE_STT_PROVIDER");
+  const { name, source } = provider("VOICE_STT_PROVIDER");
+  const vendor = pick(STT_VENDORS, name, source, "VOICE_STT_PROVIDER");
 
   if (name === "browser") {
     // The transcript arrives already transcribed from the client. This row
@@ -96,8 +100,8 @@ export function getSpeechToText(): SpeechToText {
 
 export function getTextToSpeech(): TextToSpeech {
   if (ttsCache) return ttsCache;
-  const name = env("VOICE_TTS_PROVIDER") ?? "openai";
-  const vendor = pick(TTS_VENDORS, name, "VOICE_TTS_PROVIDER");
+  const { name, source } = provider("VOICE_TTS_PROVIDER");
+  const vendor = pick(TTS_VENDORS, name, source, "VOICE_TTS_PROVIDER");
 
   if (name === "elevenlabs") {
     ttsCache = createElevenLabsTTS({
@@ -138,14 +142,33 @@ export function voiceStatus(): { stt: boolean; tts: boolean; reason?: string } {
   return { stt, tts, reason };
 }
 
-function pick(table: Record<string, VoiceVendor>, name: string, envName: string): VoiceVendor {
+// `source` is the var the value actually came from, so the error blames the
+// line the reader has to edit rather than one they never set.
+function provider(specificEnv: string): { name: string; source: string } {
+  const specific = env(specificEnv);
+  if (specific) return { name: specific, source: specificEnv };
+  const shared = env("VOICE_PROVIDER");
+  if (shared) return { name: shared, source: "VOICE_PROVIDER" };
+  return { name: "openai", source: specificEnv };
+}
+
+function pick(
+  table: Record<string, VoiceVendor>,
+  name: string,
+  source: string,
+  specificEnv: string,
+): VoiceVendor {
   const vendor = table[name];
-  if (!vendor) {
-    throw new Error(
-      `Unknown ${envName}="${name}". Valid values: ${Object.keys(table).join(", ")}. See .env.example.`,
-    );
-  }
-  return vendor;
+  if (vendor) return vendor;
+
+  const valid = Object.keys(table).join(", ");
+  // Hitting this through VOICE_PROVIDER means the vendor sells the other half
+  // but not this one, so point at the escape hatch instead of just refusing.
+  const hint =
+    source === "VOICE_PROVIDER"
+      ? ` "${name}" is not available for this half of voice; set ${specificEnv} to something else.`
+      : "";
+  throw new Error(`Unknown ${source}="${name}". Valid values: ${valid}.${hint} See .env.example.`);
 }
 
 function key(vendor: VoiceVendor): string {

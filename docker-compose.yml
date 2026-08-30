@@ -63,8 +63,11 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-onboarding@resend.dev}
-      VOICE_STT_PROVIDER: ${VOICE_STT_PROVIDER:-openai}
-      VOICE_TTS_PROVIDER: ${VOICE_TTS_PROVIDER:-openai}
+      # Left empty rather than defaulted, so an unset per-side var falls
+      # through to VOICE_PROVIDER instead of being pinned here.
+      VOICE_PROVIDER: ${VOICE_PROVIDER:-openai}
+      VOICE_STT_PROVIDER: ${VOICE_STT_PROVIDER:-}
+      VOICE_TTS_PROVIDER: ${VOICE_TTS_PROVIDER:-}
       VOICE_STT_MODEL: ${VOICE_STT_MODEL:-}
       VOICE_TTS_MODEL: ${VOICE_TTS_MODEL:-}
       VOICE_TTS_VOICE: ${VOICE_TTS_VOICE:-}
