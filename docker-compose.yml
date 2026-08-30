@@ -62,7 +62,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MAIL_FROM: ${MAIL_FROM:-onboarding@resend.dev}
+      MAIL_FROM: ${MAIL_FROM:-Bright Smile Clinic <onboarding@resend.dev>}
       # Left empty rather than defaulted, so an unset per-side var falls
       # through to VOICE_PROVIDER instead of being pinned here.
       VOICE_PROVIDER: ${VOICE_PROVIDER:-openai}
