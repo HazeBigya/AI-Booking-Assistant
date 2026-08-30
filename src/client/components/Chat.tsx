@@ -49,6 +49,9 @@ export function Chat() {
   }, [messages, state]);
 
   async function newConversation() {
+    // Nothing of the old conversation should outlive it, least of all a voice
+    // still answering a question the patient has just walked away from.
+    voice.stopSpeaking();
     try {
       await resetChat();
     } catch {
@@ -64,6 +67,11 @@ export function Chat() {
     const body = text.trim();
     if (!body || sending.current) return null;
     sending.current = true;
+
+    // Asking the next question ends the answer to the last one. Letting her
+    // finish means the patient reads a reply while hearing the one before it,
+    // and typing over someone is how a person says "yes, I've got that".
+    voice.stopSpeaking();
 
     const next = [...messages, { role: "user", content: body } as ChatTurn];
     setMessages(next);
