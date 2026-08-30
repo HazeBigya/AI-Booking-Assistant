@@ -72,13 +72,20 @@ describe("voice provider resolution", () => {
     expect(getTextToSpeech().name).toBe("elevenlabs");
   });
 
-  // elevenlabs speaks but does not listen here, so the shared var cannot
-  // resolve the STT half. The error has to name the way out.
+  // browser listens but has no TTS row, so the shared var cannot resolve the
+  // speaking half. The error has to name the way out.
   it("points at the per-side var when a shared vendor covers only one half", () => {
+    process.env.VOICE_PROVIDER = "browser";
+    expect(getSpeechToText().name).toBe("browser");
+    expect(() => getTextToSpeech()).toThrowError(/VOICE_TTS_PROVIDER/);
+  });
+
+  // Scribe and the voices are separate products, so one key covers both halves.
+  it("uses one ElevenLabs key for both halves", () => {
     process.env.VOICE_PROVIDER = "elevenlabs";
     process.env.ELEVENLABS_API_KEY = "el-test";
+    expect(getSpeechToText().name).toBe("elevenlabs");
     expect(getTextToSpeech().name).toBe("elevenlabs");
-    expect(() => getSpeechToText()).toThrowError(/VOICE_STT_PROVIDER/);
   });
 
   it("resolves the two sides independently", () => {

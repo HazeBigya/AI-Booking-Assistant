@@ -1,4 +1,5 @@
-import type { SpokenAudio, TextToSpeech } from "./types";
+import { extensionFor } from "./mime";
+import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
 
 // 'Rachel' — ElevenLabs' stock voice, present on every account, so the connector
 // works before anyone has picked a voice.
@@ -25,6 +26,39 @@ export function createElevenLabsTTS(cfg: ElevenLabsConfig): TextToSpeech {
         throw new Error(`ElevenLabs TTS failed (${res.status}): ${await res.text()}`);
       }
       return { audio: new Uint8Array(await res.arrayBuffer()), mimeType: "audio/mpeg" };
+    },
+  };
+}
+
+// Scribe. Priced and billed separately from the voices, so using it does not
+// oblige anyone to buy TTS from the same vendor — VOICE_STT_PROVIDER and
+// VOICE_TTS_PROVIDER stay independent.
+export function createElevenLabsSTT(cfg: ElevenLabsConfig): SpeechToText {
+  return {
+    name: "elevenlabs",
+    async transcribe(audio: Uint8Array, mimeType: string): Promise<string> {
+      // multipart, unlike the JSON body TTS takes. The extension carries the
+      // codec, since the browser's mime is all we know about the recording.
+      const form = new FormData();
+      form.append("model_id", cfg.model);
+      form.append(
+        "file",
+        new Blob([audio as unknown as BlobPart], { type: mimeType }),
+        `audio.${extensionFor(mimeType)}`,
+      );
+
+      const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+        method: "POST",
+        // No content-type header: fetch must set it to include the multipart
+        // boundary, and naming it here would produce a body the API cannot split.
+        headers: { "xi-api-key": cfg.apiKey },
+        body: form,
+      });
+      if (!res.ok) {
+        throw new Error(`ElevenLabs STT failed (${res.status}): ${await res.text()}`);
+      }
+      const json = (await res.json()) as { text?: string };
+      return (json.text ?? "").trim();
     },
   };
 }

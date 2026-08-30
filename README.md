@@ -46,8 +46,8 @@ npm run dev               # http://localhost:3000, hot reload
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `OPENROUTER_API_KEY` (+ matching `*_MODEL`) | one key per vendor — which is what lets several be configured at once for failover |
 | `CUSTOM_BASE_URL` / `CUSTOM_API_KEY` / `CUSTOM_MODEL` | with `AI_PROVIDER=custom`: any OpenAI-compatible endpoint (Qwen, Kimi, Groq, local Ollama/vLLM) |
 | `AWS_REGION` / `BEDROCK_MODEL_ID` | used for `bedrock` (creds via the AWS chain, native adapter) |
-| `VOICE_PROVIDER` | one vendor for both ears and mouth: `openai` (default), `deepgram`. Enough on its own for either |
-| `VOICE_STT_PROVIDER` | overrides the ears only: `openai`, `deepgram`, `browser` (free, Chrome only, no key) |
+| `VOICE_PROVIDER` | one vendor for both ears and mouth: `openai` (default), `elevenlabs`, `deepgram`. Enough on its own for any of them |
+| `VOICE_STT_PROVIDER` | overrides the ears only: `openai`, `elevenlabs`, `deepgram`, `browser` (free, Chrome only, no key) |
 | `VOICE_TTS_PROVIDER` | overrides the mouth only: `openai`, `elevenlabs`, `deepgram`. No `browser` row on purpose — see Voice below |
 | `ELEVENLABS_API_KEY` / `DEEPGRAM_API_KEY` (+ `VOICE_STT_MODEL` / `VOICE_TTS_MODEL` / `VOICE_TTS_VOICE`) | one key per speech vendor; model ids are overridable because vendors rename them |
 | `CLINIC_TIMEZONE` | IANA name for the clinic's wall clock — sets opening hours and which slots exist |
@@ -135,10 +135,10 @@ typed one — and is guarded by the same `tstzrange` exclusion constraint.
 Voice resolves independently of `AI_PROVIDER`, because the chat vendor may sell
 no speech at all — running `AI_PROVIDER=deepseek` with `VOICE_PROVIDER=openai`
 is the normal case, not a workaround. One `VOICE_PROVIDER` covers both halves
-where a vendor sells both (`openai`, `deepgram`); `VOICE_STT_PROVIDER` and
-`VOICE_TTS_PROVIDER` override one half each, which is what the asymmetric rows
-need — `elevenlabs` speaks but has no STT row here, `browser` listens but is
-deliberately refused as a voice.
+(`openai`, `elevenlabs`, `deepgram` each sell both, and each bills them
+separately, so using one half obliges nothing about the other).
+`VOICE_STT_PROVIDER` and `VOICE_TTS_PROVIDER` override one half each — to mix
+vendors, or because `browser` listens but is deliberately refused as a voice.
 
 **Why there is no browser-speech fallback.** The browser's built-in
 `speechSynthesis` is free and needs no key, and it is also the flat robotic

@@ -1,4 +1,5 @@
 import OpenAI, { toFile } from "openai";
+import { extensionFor } from "./mime";
 import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
 
 export interface OpenAIVoiceConfig {
@@ -38,16 +39,4 @@ export function createOpenAITTS(cfg: OpenAIVoiceConfig): TextToSpeech {
       return { audio: new Uint8Array(await res.arrayBuffer()), mimeType: "audio/mpeg" };
     },
   };
-}
-
-function extensionFor(mimeType: string): string {
-  const base = mimeType.split(";")[0].trim();
-  const known: Record<string, string> = {
-    "audio/webm": "webm",
-    "audio/ogg": "ogg",
-    "audio/mp4": "mp4",
-    "audio/mpeg": "mp3",
-    "audio/wav": "wav",
-  };
-  return known[base] ?? "webm";
 }

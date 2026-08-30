@@ -1,5 +1,5 @@
 import { createDeepgramSTT, createDeepgramTTS } from "./deepgram";
-import { createElevenLabsTTS } from "./elevenlabs";
+import { createElevenLabsSTT, createElevenLabsTTS } from "./elevenlabs";
 import { createOpenAISTT, createOpenAITTS } from "./openai";
 import type { SpeechToText, TextToSpeech } from "./types";
 
@@ -15,9 +15,8 @@ interface VoiceVendor {
 // Two independent choices, because STT and TTS are separate products with
 // separate prices, and because the chat vendor (AI_PROVIDER) may sell neither.
 // VOICE_PROVIDER sets both at once for the common case where one vendor sells
-// both; the per-side vars override it, because the tables below are not
-// symmetric — elevenlabs speaks but does not listen, browser listens but does
-// not speak.
+// both; the per-side vars override it, for mixing vendors and because the
+// tables below are not symmetric — browser listens but is refused as a voice.
 //
 // Model ids drift between releases, so every default has an env override and
 // nothing here is a hardcoded constant.
@@ -27,6 +26,12 @@ export const STT_VENDORS: Record<string, VoiceVendor> = {
     keyEnv: "OPENAI_API_KEY",
     modelEnv: "VOICE_STT_MODEL",
     defaultModel: "whisper-1",
+  },
+  elevenlabs: {
+    label: "ElevenLabs Scribe",
+    keyEnv: "ELEVENLABS_API_KEY",
+    modelEnv: "VOICE_STT_MODEL",
+    defaultModel: "scribe_v2",
   },
   deepgram: {
     label: "Deepgram",
@@ -90,6 +95,8 @@ export function getSpeechToText(): SpeechToText {
         throw new Error("browser STT transcribes in the client, not on the server");
       },
     };
+  } else if (name === "elevenlabs") {
+    sttCache = createElevenLabsSTT({ apiKey: key(vendor), model: model(vendor) });
   } else if (name === "deepgram") {
     sttCache = createDeepgramSTT({ apiKey: key(vendor), model: model(vendor) });
   } else {
