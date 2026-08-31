@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SILENCE, SilenceDetector } from "@client/voice/silence";
+import { DEFAULT_SILENCE, SilenceDetector, type SilenceVerdict } from "@client/voice/silence";
 
 // Feed a series of [level, ms] samples and return the last verdict.
 function feed(det: SilenceDetector, samples: [number, number][]) {
@@ -113,5 +113,38 @@ describe("SilenceDetector", () => {
 
   it("defaults to a pause long enough for a hesitant speaker", () => {
     expect(DEFAULT_SILENCE.silenceMs).toBeGreaterThanOrEqual(1500);
+  });
+});
+
+// The failure this prevents does not look like a threshold problem from the
+// outside. A room noisier than the fixed floor keeps refreshing "last heard
+// sound", so silence never arrives and the turn runs to maxMs — thirty seconds
+// of a microphone that will not switch off after the patient stopped talking.
+describe("adapting to the room", () => {
+  it("ends the turn in a room whose hum sits above the fixed floor", () => {
+    const hum = 0.03; // above threshold 0.02, so a fixed floor hears it forever
+    const det = new SilenceDetector();
+    // 300ms of room, measured.
+    for (let t = 0; t < 300; t += 50) det.push(hum, t);
+    // Speech, then the patient stops and only the hum is left.
+    for (let t = 300; t < 900; t += 50) det.push(0.25, t);
+    let verdict: SilenceVerdict = "speaking";
+    for (let t = 900; t <= 3000 && verdict !== "done"; t += 50) verdict = det.push(hum, t);
+    expect(verdict).toBe("done");
+  });
+
+  it("still hears an ordinary voice when the room is measured mid-sentence", () => {
+    const det = new SilenceDetector();
+    // Nothing quiet to calibrate against: the patient is already talking.
+    let verdict: SilenceVerdict = "listening";
+    for (let t = 0; t < 600; t += 50) verdict = det.push(0.25, t);
+    expect(verdict).toBe("speaking");
+  });
+
+  // A silent room must not make the detector hair-trigger on a breath.
+  it("never drops below the fixed floor", () => {
+    const det = new SilenceDetector();
+    for (let t = 0; t < 300; t += 50) det.push(0.0001, t);
+    expect(det.push(0.01, 350)).toBe("listening");
   });
 });

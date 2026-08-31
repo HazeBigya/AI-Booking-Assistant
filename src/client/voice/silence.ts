@@ -7,25 +7,44 @@
 
 // prettier-ignore
 export interface SilenceOptions {
-  threshold?: number;   // RMS level counted as speech (0..1)
-  silenceMs?: number;   // quiet needed after speech to end the turn
-  minSpeechMs?: number; // speech shorter than this was a cough, not a turn
-  maxMs?: number;       // hard stop, so a stuck mic cannot record forever
+  threshold?: number;    // floor RMS counted as speech (0..1), before the room
+  silenceMs?: number;    // quiet needed after speech to end the turn
+  minSpeechMs?: number;  // speech shorter than this was a cough, not a turn
+  maxMs?: number;        // hard stop, so a stuck mic cannot record forever
+  noiseWindowMs?: number; // opening stretch measured as the room by itself
+  noiseMargin?: number;   // how far above that floor speech has to be
 }
 
 // silenceMs is generous on purpose. 800ms is roughly the pause inside a fluent
 // native sentence, so it cut people off between clauses — and it punished
 // exactly the patients least able to absorb it: anyone speaking a second
 // language, anyone elderly, anyone thinking about a date. Being interrupted
-// mid-question costs the whole question; waiting an extra second costs a
-// second, and the mic button now ends the turn immediately for anyone who does
-// not want to wait at all.
+// mid-question costs the whole question; waiting costs the wait, and the mic
+// button ends the turn immediately for anyone who does not want to wait at all.
+// 1600ms is the tightest value that still clears a hesitation of a second and a
+// half, which is the pause that prompted raising it in the first place.
 export const DEFAULT_SILENCE: Required<SilenceOptions> = {
   threshold: 0.02,
-  silenceMs: 2000,
+  silenceMs: 1600,
   minSpeechMs: 300,
   maxMs: 30_000,
+  noiseWindowMs: 300,
+  noiseMargin: 2.5,
 };
+
+// A fixed threshold assumes a quiet room. A fan, a laptop fan close to the mic,
+// or the browser's own gain control can hold the level above 0.02 for the whole
+// turn — and then the detector never sees silence at all, so the turn does not
+// end when the patient stops talking. It ends at maxMs, thirty seconds later,
+// which reads as a microphone that will not switch off rather than a threshold
+// that is too low.
+//
+// So the opening moments of a turn, before anyone has said anything, are taken
+// as a measurement of the room, and speech has to be a clear multiple of that.
+// Clamped at both ends: never below the fixed floor, so a silent room does not
+// make it hair-trigger, and never so high that ordinary speech (0.1–0.3) stops
+// registering if the patient talks over the measurement.
+const MAX_ADAPTIVE_THRESHOLD = 0.08;
 
 export type SilenceVerdict = "listening" | "speaking" | "done";
 
@@ -35,6 +54,7 @@ export class SilenceDetector {
   private speechMs = 0;
   private lastLoudAt: number | null = null;
   private lastAt: number | null = null;
+  private noiseFloor = 0;
 
   constructor(opts: SilenceOptions = {}) {
     this.opts = { ...DEFAULT_SILENCE, ...opts };
@@ -45,6 +65,13 @@ export class SilenceDetector {
     this.speechMs = 0;
     this.lastLoudAt = null;
     this.lastAt = null;
+    this.noiseFloor = 0;
+  }
+
+  // What counts as speech in this room, rather than in a quiet one.
+  private get speechLevel(): number {
+    const adapted = this.noiseFloor * this.opts.noiseMargin;
+    return Math.min(Math.max(this.opts.threshold, adapted), MAX_ADAPTIVE_THRESHOLD);
   }
 
   push(level: number, atMs: number): SilenceVerdict {
@@ -52,7 +79,13 @@ export class SilenceDetector {
     const delta = this.lastAt === null ? 0 : Math.max(0, atMs - this.lastAt);
     this.lastAt = atMs;
 
-    if (level >= this.opts.threshold) {
+    // Measure the room only while it is still the room: the opening stretch,
+    // and only until something loud enough to be speech has been heard.
+    if (this.lastLoudAt === null && atMs - this.startedAt < this.opts.noiseWindowMs) {
+      this.noiseFloor = Math.max(this.noiseFloor, level);
+    }
+
+    if (level >= this.speechLevel) {
       this.speechMs += delta;
       this.lastLoudAt = atMs;
     }
@@ -67,7 +100,7 @@ export class SilenceDetector {
       if (this.lastLoudAt !== null && atMs - this.lastLoudAt >= this.opts.silenceMs) return "done";
     }
     // Sound arriving right now, so the orb lights up before the turn is over.
-    if (level >= this.opts.threshold) return "speaking";
+    if (level >= this.speechLevel) return "speaking";
     return spokeEnough ? "speaking" : "listening";
   }
 }
