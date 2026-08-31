@@ -1,3 +1,4 @@
+import { httpFailure } from "./failure";
 import { extensionFor } from "./mime";
 import { ELEVENLABS_VOICE_ID, ELEVENLABS_VOICE_SETTINGS } from "./persona";
 import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
@@ -24,9 +25,7 @@ export function createElevenLabsTTS(cfg: ElevenLabsConfig): TextToSpeech {
           }),
         },
       );
-      if (!res.ok) {
-        throw new Error(`ElevenLabs TTS failed (${res.status}): ${await res.text()}`);
-      }
+      if (!res.ok) throw await httpFailure("ElevenLabs TTS", res);
       return { audio: new Uint8Array(await res.arrayBuffer()), mimeType: "audio/mpeg" };
     },
   };
@@ -56,9 +55,7 @@ export function createElevenLabsSTT(cfg: ElevenLabsConfig): SpeechToText {
         headers: { "xi-api-key": cfg.apiKey },
         body: form,
       });
-      if (!res.ok) {
-        throw new Error(`ElevenLabs STT failed (${res.status}): ${await res.text()}`);
-      }
+      if (!res.ok) throw await httpFailure("ElevenLabs STT", res);
       const json = (await res.json()) as { text?: string };
       return (json.text ?? "").trim();
     },

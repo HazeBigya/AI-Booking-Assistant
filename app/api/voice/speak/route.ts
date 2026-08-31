@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getTextToSpeech } from "@server/sdk/voice";
+import { configFailure } from "@server/sdk/voice/failure";
 
 // One sentence at a time. Anything longer is not a chunk, it is a whole reply,
 // which is the latency problem the chunking exists to avoid.
@@ -31,6 +32,13 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("speak failed:", err);
-    return NextResponse.json({ error: "Could not generate speech." }, { status: 502 });
+    // A plan restriction or a bad key reads the same on every attempt, so the
+    // vendor's sentence is worth more than a retry suggestion. Anything that
+    // might be transient keeps the generic line.
+    const settings = configFailure(err);
+    return NextResponse.json(
+      { error: settings ?? "Could not generate speech." },
+      { status: settings ? 503 : 502 },
+    );
   }
 }

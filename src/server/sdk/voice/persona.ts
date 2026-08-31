@@ -24,9 +24,21 @@ export const OPENAI_TTS_MODEL = "tts-1-hd";
 // has no direction field, so the voice carries the entire personality.
 export const OPENAI_VOICE = "shimmer";
 
-// 'Rachel' — a warm female stock voice present on every ElevenLabs account, so
-// the connector matches the same receptionist without anyone browsing a library.
-export const ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+// 'Jessica' — female, conversational, closest of the four to the receptionist
+// OpenAI's shimmer plays.
+//
+// Not Rachel, which is the obvious pick and was the first one here: ElevenLabs
+// classes it as a library voice, and a free key is refused it with a 402 at
+// request time. Nothing about the key or the account says so in advance — STT
+// on the same key works, the voice appears in the docs, and the failure only
+// arrives once someone speaks. Whoever runs this gets whichever plan they
+// signed up for, so the default has to be one the smallest plan can actually
+// reach. These four were confirmed against a free key; swapping between them is
+// a one-line change:
+//   Sarah   EXAVITQu4vr4xnSDxMaL  softer, more formal
+//   Matilda XrExE9yKIg1WjnnlVkGX  warm, slower
+//   Lily    pFZP5JQG7iQjIQuC4Bku  lower, calmer
+export const ELEVENLABS_VOICE_ID = "cgSgspJ2msm6clMCkdW9";
 
 // ElevenLabs shapes delivery through numbers rather than a voice choice alone.
 // Stability below the midpoint lets the reading vary sentence to sentence,

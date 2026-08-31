@@ -1,3 +1,4 @@
+import { httpFailure } from "./failure";
 import type { SpeechToText, SpokenAudio, TextToSpeech } from "./types";
 
 export interface DeepgramConfig {
@@ -15,7 +16,7 @@ export function createDeepgramSTT(cfg: DeepgramConfig): SpeechToText {
         headers: { authorization: `Token ${cfg.apiKey}`, "content-type": mimeType },
         body: audio as unknown as BodyInit, // raw bytes, not multipart
       });
-      if (!res.ok) throw new Error(`Deepgram STT failed (${res.status}): ${await res.text()}`);
+      if (!res.ok) throw await httpFailure("Deepgram STT", res);
       const json = (await res.json()) as {
         results?: { channels?: { alternatives?: { transcript?: string }[] }[] };
       };
@@ -34,7 +35,7 @@ export function createDeepgramTTS(cfg: DeepgramConfig): TextToSpeech {
         headers: { authorization: `Token ${cfg.apiKey}`, "content-type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) throw new Error(`Deepgram TTS failed (${res.status}): ${await res.text()}`);
+      if (!res.ok) throw await httpFailure("Deepgram TTS", res);
       return { audio: new Uint8Array(await res.arrayBuffer()), mimeType: "audio/mpeg" };
     },
   };

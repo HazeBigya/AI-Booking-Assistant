@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSpeechToText } from "@server/sdk/voice";
+import { configFailure } from "@server/sdk/voice/failure";
 
 // A minute of opus is roughly 250 KB; anything past this is not a spoken turn.
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -37,7 +38,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text });
   } catch (err) {
     console.error("transcribe failed:", err);
-    return NextResponse.json({ error: "Could not transcribe that." }, { status: 502 });
+    const settings = configFailure(err);
+    return NextResponse.json(
+      { error: settings ?? "Could not transcribe that." },
+      { status: settings ? 503 : 502 },
+    );
   }
 }
 
