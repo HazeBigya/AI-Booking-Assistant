@@ -14,7 +14,12 @@ import {
   zonedTimeToUtc,
 } from "@server/domain/booking/timezone";
 import { createOtp, verifyOtp } from "@server/auth/otp";
-import { findOrCreatePatient } from "@server/auth/patients";
+import {
+  findOrCreatePatient,
+  knownPatientName,
+  placeholderNameFor,
+  setPatientName,
+} from "@server/auth/patients";
 import { getMailer } from "@server/sdk/mailer";
 import { rateLimit } from "@server/shared/rate-limit";
 
@@ -138,9 +143,15 @@ export const toolDefs: ToolDef[] = [
             "clinic's 9am is not 09:00Z unless the clinic happens to sit on UTC, and writing " +
             "the hour the patient said followed by Z books a different time of day.",
         },
-        patientName: { type: "string", description: "The patient's full name." },
+        patientName: {
+          type: "string",
+          description:
+            "The patient's full name. OMIT this if they have not given it — the clinic " +
+            "already has it on file for anyone who has booked before, and this tool will " +
+            "ask only when it genuinely does not.",
+        },
       },
-      required: ["serviceName", "dentistName", "start", "patientName"],
+      required: ["serviceName", "dentistName", "start"],
     },
   },
   {
@@ -178,7 +189,7 @@ const schemas = {
     serviceName: z.string().min(1),
     dentistName: z.string().min(1),
     start: z.string(),
-    patientName: z.string().min(1),
+    patientName: z.string().min(1).optional(),
   }),
   cancel_booking: z.object({ bookingId: z.number().int() }),
 };
@@ -336,7 +347,7 @@ export async function runTool(
       if (!(await verifyOtp(parsed.data.email, parsed.data.code))) {
         return JSON.stringify({ ok: false, message: "That code is invalid or expired." });
       }
-      await findOrCreatePatient(parsed.data.email, parsed.data.email.split("@")[0]);
+      await findOrCreatePatient(parsed.data.email, placeholderNameFor(parsed.data.email));
       ctx.authedEmail = parsed.data.email; // authenticated for the rest of this request
       ctx.authenticatedAs = parsed.data.email; // route persists the session cookie
       return JSON.stringify({ ok: true, message: "Email verified — you're logged in." });
@@ -389,11 +400,26 @@ export async function runTool(
       if ("error" in svc) return errorResult(svc.error);
       const den = await resolveDentist(svc.service.code, svc.service.name, parsed.data.dentistName);
       if ("error" in den) return errorResult(den.error);
+
+      // Asking a returning patient for a name the clinic already holds is a
+      // question with no purpose, and every extra question is one more place a
+      // booking can be abandoned. So the stored name is used when there is one,
+      // and a newly given name is written back so the next visit is shorter.
+      const supplied = parsed.data.patientName?.trim();
+      const patientName = supplied || (await knownPatientName(ctx.authedEmail));
+      if (!patientName) {
+        return errorResult(
+          "No name on file for this patient. Ask them what name to put on the booking, " +
+            "then call this tool again with patientName.",
+        );
+      }
+      if (supplied) await setPatientName(ctx.authedEmail, supplied);
+
       const result = await createBooking(pgBookingRepository, {
         serviceCode: svc.service.code,
         professionalId: den.dentist.professionalId,
         start,
-        patientName: parsed.data.patientName,
+        patientName,
         patientEmail: ctx.authedEmail,
         now,
       });
@@ -413,9 +439,9 @@ export async function runTool(
               name: "Bright Smile Clinic",
               email: process.env.SMTP_USER ?? "no-reply@brightsmile.example",
             },
-            to: { name: parsed.data.patientName, email: ctx.authedEmail },
+            to: { name: patientName, email: ctx.authedEmail },
             attendees: [
-              { name: parsed.data.patientName, email: ctx.authedEmail },
+              { name: patientName, email: ctx.authedEmail },
               ...(dentist ? [{ name: dentist.name, email: dentist.email }] : []),
             ],
           });
