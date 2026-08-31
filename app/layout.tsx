@@ -6,7 +6,7 @@ const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", display: 
 
 export const metadata: Metadata = {
   title: "Bright Smile Clinic",
-  description: "Dental clinic appointment booking assistant",
+  description: "AI front desk receptionist — books clinic appointments by chat or voice",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

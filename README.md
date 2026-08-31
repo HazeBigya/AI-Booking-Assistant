@@ -1,11 +1,17 @@
-# Dental Clinic AI Receptionist
+# Front Desk — an AI clinic receptionist
 
-A chatbot that acts as a dental clinic receptionist: it holds a natural
-conversation, understands intent (typos, synonyms), and helps a patient discover
-services, compare dentists, check availability, verify their email, and book —
-**without ever deciding availability or booking itself.** The AI calls
-deterministic backend functions ("tools"); correctness lives in code and in the
-database.
+An assistant that does the job of a front desk: it holds a natural conversation
+by text or by voice, understands what someone meant through typos and
+synonyms, and helps them find a service, compare practitioners, check
+availability, verify their email and book — **without ever deciding
+availability or booking itself.** The AI calls deterministic backend functions
+("tools"); correctness lives in code and in the database.
+
+It ships seeded as a dental clinic because that is what the brief asked for,
+but nothing structural is dental. Opening hours, the slot grid, double-booking,
+login and the guardrails never learn what is being booked. The distance to a
+physiotherapy or optometry front desk is the seed data and one word in
+`sdk/ai/prompt.ts`.
 
 > New to running projects? See **[SETUP.md](./SETUP.md)** for a step-by-step
 > guide (install Docker, add one key, run one command).

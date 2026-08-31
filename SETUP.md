@@ -1,4 +1,4 @@
-# Setup Guide — Dental Clinic AI Receptionist (Mac)
+# Setup Guide — Front Desk, an AI clinic receptionist (Mac)
 
 This guide is written for someone who has **not** run a developer project before.
 Follow it top to bottom. It takes about **15 minutes**, most of which is waiting
