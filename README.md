@@ -14,7 +14,8 @@ physiotherapy or optometry front desk is the seed data and one word in
 `sdk/ai/prompt.ts`.
 
 > New to running projects? See **[SETUP.md](./SETUP.md)** for a step-by-step
-> guide (install Docker, add one key, run one command).
+> guide with separate macOS and Windows paths (install Node + Docker, add one
+> key, start it).
 
 ## Requirements
 
@@ -36,15 +37,29 @@ The app, the database and the migration step each run in a container.
 **Ports used:** `3000` (app) and `5432` (Postgres). If something already holds
 one, stop it first.
 
-## Quick start (one command)
+## Quick start
 
 ```bash
 cp .env.example .env      # set AI_PROVIDER + that provider's API key
-npm run start:all         # everything: Docker, Postgres, migrate, seed, app
+npm run start:all         # macOS: Docker, Postgres, migrate, seed, app
 ```
 
-Open http://localhost:3000. Stop with `Ctrl+C`. On macOS, double-clicking
-`start.command` in Finder does the same thing without a terminal.
+Open http://localhost:3000. Stop with `Ctrl+C`. Double-clicking `start.command`
+in Finder does the same without a terminal.
+
+**On Windows**, start Docker Desktop yourself and run compose directly:
+
+```powershell
+docker compose up --build
+```
+
+`start:all` is a macOS convenience wrapper — it launches Docker Desktop and
+passes the host's time zone in. Neither is portable (`open -a Docker`,
+`readlink /etc/localtime`), and the underlying `docker compose up --build` is
+identical on both, so Windows loses the two conveniences rather than a feature.
+The one that matters: containers run on UTC, so **Windows users must set
+`CLINIC_TIMEZONE` in `.env`** or the clinic opens at 9:00 UTC. See
+[SETUP.md](./SETUP.md) for the step-by-step version of both paths.
 
 ### Does that migrate and seed? Yes — every time, on purpose.
 

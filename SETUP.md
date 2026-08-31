@@ -1,56 +1,81 @@
-# Setup Guide — Front Desk, an AI clinic receptionist (Mac)
+# Setup Guide — Front Desk, an AI clinic receptionist
 
-This guide is written for someone who has **not** run a developer project before.
-Follow it top to bottom. It takes about **15 minutes**, most of which is waiting
-for downloads. You will end with the app running in your web browser.
+Written for someone who has **not** run a developer project before. Follow it top
+to bottom. About **15 minutes**, most of it waiting for downloads. You end with
+the app running in your browser.
 
-You will do three things:
+Three things to do:
 
-1. Install **Docker Desktop** (the engine that runs the app + its database).
+1. Install **Node.js** and **Docker Desktop**.
 2. Add **one AI key** to a settings file.
-3. **Start** the app with a single command (or a double-click).
+3. **Start** it.
+
+Steps 1 and 2 are the same on Mac and Windows. Step 3 differs, so it has a
+section for each — go to yours and ignore the other.
 
 ---
 
 ## What you received
 
 A folder called `booking-chat-bot`. Everything lives inside it. You do **not**
-need to install a database, a programming language, or anything else — Docker
-packages all of that for you.
+need to install a database — Docker provides it.
 
 ---
 
-## Step 1 — Install Docker Desktop
+## Step 1 — Install Node.js
 
-Docker is a free tool that runs the app and its database in a self-contained box,
-so it behaves the same on every computer.
+Go to **https://nodejs.org** and download the version marked **LTS** (20 or
+newer). Run the installer and accept the defaults.
+
+> **npm comes with it.** You do not install npm separately — the Node installer
+> includes it. It is the command that runs this project's scripts.
+
+To check it worked, open a terminal (**Terminal** on Mac, **PowerShell** on
+Windows) and run:
+
+```bash
+node -v
+npm -v
+```
+
+Two version numbers means you are done. `node -v` must print `v20` or higher.
+
+---
+
+## Step 2 — Install Docker Desktop
+
+Docker runs the app and its database in self-contained boxes, so they behave the
+same on every computer.
+
+### Mac
 
 1. Go to **https://www.docker.com/products/docker-desktop/**
-2. Click **Download for Mac**. Pick the chip your Mac has:
-   - **Apple Silicon** (M1/M2/M3/M4) — most Macs from 2020 onward.
+2. Click **Download for Mac**, and pick your chip:
+   - **Apple Silicon** (M1/M2/M3/M4) — most Macs from 2020 on.
    - **Intel** — older Macs.
-   - Not sure? Click the Apple menu () → **About This Mac**. If it says
-     "Apple M…", choose Apple Silicon.
-3. Open the downloaded `.dmg` and drag **Docker** into **Applications**.
-4. Open **Docker** from Applications. Accept the terms.
-5. Wait until the **whale icon** in the top menu bar stops animating and shows
-   "Docker Desktop is running". You can close the Docker window; it keeps
-   running in the background.
+   - Not sure? Apple menu → **About This Mac**. "Apple M…" means Apple Silicon.
+3. Open the `.dmg`, drag **Docker** into **Applications**.
+4. Open **Docker** from Applications, accept the terms.
+5. Wait until the **whale icon** in the menu bar stops animating.
 
-> You only ever do Step 1 once.
+### Windows
+
+1. Go to **https://www.docker.com/products/docker-desktop/**
+2. Click **Download for Windows**.
+3. Run the installer. Leave **"Use WSL 2 instead of Hyper-V"** ticked — Docker
+   needs WSL 2, and the installer sets it up for you.
+4. **Restart** when it asks. This is required, not optional.
+5. Open **Docker Desktop** and wait until it says **"Engine running"** at the
+   bottom left.
+
+> You only do Steps 1 and 2 once, ever.
 
 ---
 
-## Step 2 — Add your AI key
+## Step 3 — Add your AI key
 
-The receptionist needs an AI provider to talk. You need **one** key, from whichever
-company you prefer — you choose the provider, the quality level, and you pay them
-directly.
-
-### Get a key (pick one)
-
-You pay this company directly for what the assistant uses. The key is stored only
-in your own settings file.
+The receptionist needs an AI provider to talk. You need **one** key, from
+whichever company you prefer. You pay them directly.
 
 | Provider | Sign up at | Notes |
 |---|---|---|
@@ -58,147 +83,231 @@ in your own settings file.
 | **OpenAI** | https://platform.openai.com/api-keys | |
 | **Anthropic (Claude)** | https://platform.claude.com/settings/keys | |
 | **Google Gemini** | https://aistudio.google.com/app/apikey | |
-| **OpenRouter** | https://openrouter.ai/keys | One key, hundreds of models from all the above |
+| **OpenRouter** | https://openrouter.ai/keys | One key, hundreds of models |
 
 Create a key and copy it (most start with `sk-`).
 
-> The assistant works correctly whichever you choose. Availability, double-booking,
-> past dates and patient identity are enforced by the app itself, not by the AI —
-> a cheaper model cannot book you into a taken slot. A stronger model mainly
-> sounds more natural.
+> Whichever you choose, the assistant books correctly. Availability,
+> double-booking, past dates and patient identity are enforced by the app, not by
+> the AI — a cheaper model cannot book you into a taken slot. A stronger model
+> mainly sounds more natural.
 
-### Put the key in the settings file
+### Make the settings file
 
-1. In the `booking-chat-bot` folder, find the file **`.env.example`**.
-2. Make a copy named **`.env`** (exactly that, with the leading dot).
-   - Easiest way: open **Terminal** (Applications → Utilities → Terminal),
-     then run these two lines (drag the folder onto the Terminal window after
-     typing `cd ` to fill in the path):
-     ```bash
-     cd /path/to/booking-chat-bot
-     cp .env.example .env
-     ```
-3. Open **`.env`** in TextEdit. Set `AI_PROVIDER` to the provider you signed up
-   with, then paste your key on that provider's line. For example, for Claude:
-   ```
-   AI_PROVIDER=anthropic
+In the project folder there is a file called **`.env.example`**. Copy it to
+**`.env`** (exactly that, with the leading dot).
 
-   ANTHROPIC_API_KEY=sk-your-key-here
-   ```
-   Leave the other providers' key lines empty.
-4. Optional: list two providers, and the second is used automatically if the
-   first is down or out of credit:
-   ```
-   AI_PROVIDER=anthropic,deepseek
-   ```
-   Fill in a key for each one you list.
-5. Save and close.
+**Mac** — open Terminal, then:
 
-> **Time zone is automatic.** The clinic runs on your computer's time zone unless
-> you say otherwise, so "9:00 AM" means 9:00 AM to you. If the clinic is somewhere
-> else, set `CLINIC_TIMEZONE` in `.env` to its
-> [IANA name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
-> (`Asia/Kathmandu`, `Asia/Taipei`, …). Patients in other countries always see
-> clinic time, plus their own local time alongside it.
+```bash
+cd /path/to/booking-chat-bot
+cp .env.example .env
+```
 
-> **Email is optional.** Without email settings, login codes and booking
-> confirmations print to the app's log window instead of being emailed — perfect
-> for a demo. To send real emails, see "Optional: real emails" below.
+> Tip: type `cd ` (with the space), then drag the folder onto the Terminal
+> window to fill in the path.
+
+**Windows** — open PowerShell, then:
+
+```powershell
+cd C:\path\to\booking-chat-bot
+Copy-Item .env.example .env
+```
+
+> Tip: in File Explorer, right-click the folder while holding **Shift** and
+> choose **"Open PowerShell window here"** to skip the `cd`.
+
+### Fill it in
+
+Open `.env` in any text editor (TextEdit on Mac, Notepad on Windows). Set
+`AI_PROVIDER` to the provider you signed up with, and paste your key on that
+provider's line:
+
+```
+AI_PROVIDER=anthropic
+
+ANTHROPIC_API_KEY=sk-your-key-here
+```
+
+Leave the other providers' key lines empty. Save and close.
+
+You can list two providers, and the second is used automatically if the first is
+down or out of credit. Fill in a key for each one you list:
+
+```
+AI_PROVIDER=anthropic,deepseek
+```
+
+### Windows only — set the clinic's time zone
+
+**Do not skip this on Windows.** On Mac the start script hands the app your
+computer's time zone automatically. There is no equivalent step in the Windows
+path, and containers run on UTC, so without this the clinic opens at 9:00 **UTC**
+rather than 9:00 where you are — and every appointment time you are offered is
+wrong for your clock.
+
+In `.env`, set it to the clinic's
+[IANA time zone name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones):
+
+```
+CLINIC_TIMEZONE=Asia/Kathmandu
+```
+
+Common ones: `Europe/London`, `Europe/Rome`, `America/New_York`,
+`Asia/Kathmandu`, `Asia/Taipei`.
+
+> **Email is optional.** With no email settings, login codes and booking
+> confirmations print to the app's log window instead of being emailed — which is
+> fine for a demo. See "Optional: real emails" at the end.
 
 ---
 
-## Step 3 — Start everything (one command)
+## Step 4 (Mac) — Start it
 
-Make sure Docker Desktop is running (Step 1). Then either:
+Make sure Docker Desktop is running. Then either:
 
-**Option A — double-click.** In Finder, open the `booking-chat-bot` folder and
-double-click **`start.command`**. A Terminal window opens and does the rest.
+**Option A — double-click.** In Finder, open the project folder and double-click
+**`start.command`**. A Terminal window opens and does the rest.
 
-**Option B — Terminal.** In Terminal, from inside the folder:
+**Option B — Terminal.** From inside the folder:
+
 ```bash
 npm run start:all
 ```
 
-Either way, the script will:
-- start Docker if it isn't already running,
+Either way this will:
+
+- start Docker if it is not already running,
+- pass your computer's time zone to the clinic,
 - build the app (first run only — a few minutes),
-- start the database, load the clinic's dentists + services,
+- start the database and load the dentists and services,
 - start the website.
 
-When you see logs mentioning **`ready`** and port **3000**, open your browser to:
+When the logs mention **`ready`** and port **3000**, open:
 
 ### 👉 http://localhost:3000
 
-You now have a working AI receptionist. Try: *"What services do you offer?"* or
-*"Book a checkup Monday morning."*
+Stop it with **Ctrl + C** in that window.
+
+---
+
+## Step 4 (Windows) — Start it
+
+The `npm run start:all` shortcut is written for Mac — it uses Mac-only commands
+to launch Docker and read your time zone. On Windows you do those two things
+yourself, and then run Docker directly. It is one extra command, and everything
+after it is identical.
+
+1. **Open Docker Desktop** and wait for **"Engine running"**.
+2. Check you set `CLINIC_TIMEZONE` in `.env` (previous step).
+3. In PowerShell, from inside the project folder:
+
+```powershell
+docker compose up --build
+```
+
+That does the same work the Mac script does: starts the database, applies the
+schema, loads the dentists and services, then starts the website. The first run
+downloads and builds, so give it a few minutes.
+
+When the logs mention **`ready`** and port **3000**, open:
+
+### 👉 http://localhost:3000
+
+Stop it with **Ctrl + C** in that window.
+
+> Nothing above needs Git Bash or WSL commands — plain PowerShell is enough.
+
+---
+
+## You now have a working receptionist
+
+Try: *"What services do you offer?"* or *"Book a checkup Monday morning."*
+
+Click the microphone to talk to it instead of typing, if you set a voice key.
 
 ---
 
 ## Everyday use
 
-| I want to…                     | Do this                                            |
-|--------------------------------|----------------------------------------------------|
-| Start the app                  | Double-click `start.command` (or `npm run start:all`) |
-| Stop the app                   | Click the Terminal window, press **Ctrl + C**      |
-| Start fresh (erase all data)   | `npm run destroy` then `npm run setup`             |
+| I want to… | Mac | Windows |
+|---|---|---|
+| Start the app | `npm run start:all` (or double-click `start.command`) | `docker compose up --build` |
+| Stop the app | **Ctrl + C** in that window | **Ctrl + C** in that window |
+| Erase all data and start fresh | `npm run destroy` then `npm run setup` | `docker compose down -v` then `docker compose up --build` |
 
-Your bookings are saved between restarts. `npm run destroy` wipes the database back
-to the clean seeded state (the 3 dentists + 5 services), which is handy before a
+Your bookings are saved between restarts. Erasing puts the database back to the
+clean seeded state — the 3 dentists and 5 services — which is handy before a
 demo.
+
+The database schema and the clinic's data are applied **every time you start**,
+on both platforms. That is safe: both steps skip anything already done, so
+starting twice changes nothing and your bookings survive.
 
 ---
 
 ## Troubleshooting
 
-**"Docker is not installed"** — Finish Step 1, then try again.
+**"docker: command not found" / "not recognized"** — Docker Desktop is not
+installed, or you have not restarted since installing it on Windows.
 
-**It stops with "add at least one AI key"** — You started before editing `.env`.
-Open `.env`, add your key (Step 2), save, run again.
+**"Cannot connect to the Docker daemon" / "The system cannot find the file
+specified"** — Docker Desktop is not running. Open it, wait for the whale icon
+(Mac) or "Engine running" (Windows), try again.
 
-**"Cannot connect to the Docker daemon"** — Docker Desktop isn't running. Open it
-from Applications, wait for the whale icon to settle, try again.
+**It stops with "add at least one AI key"** — you started before editing `.env`.
+Add your key, save, run again.
 
-**"port is already allocated" / 3000 in use** — Something else is using port
-3000. Quit other dev apps, or restart your Mac, then try again.
+**"port is already allocated" / 3000 in use** — something else is using port
+3000 or 5432. Quit other development tools, or restart the computer.
 
-**The chat replies "I can't reach our booking assistant right now"** — Your AI
-key is missing, wrong, or out of credit. Re-check the key in `.env`.
+**The chat says "I can't reach our booking assistant right now"** — your AI key
+is missing, wrong, or out of credit. Check the key in `.env`.
 
-**First run is slow** — Normal. It downloads and builds once; later runs are
-fast.
+**Appointment times look hours off (Windows)** — `CLINIC_TIMEZONE` is not set, so
+the clinic is running on UTC. See the Windows step above.
+
+**First run is slow** — normal. It downloads and builds once; later runs reuse
+what it built.
+
+**`npm run start:all` fails on Windows with "bash: not found"** — expected. That
+shortcut is Mac-only; use `docker compose up --build`.
 
 ---
 
 ## Optional: real emails (login codes + calendar invites)
 
-By default, codes and invites appear in the app's log window. To email them for
+By default, codes and invites appear in the app's log window. To send them for
 real, use a Gmail account:
 
-1. Turn on 2-Step Verification for the Gmail account.
+1. Turn on 2-Step Verification for that Gmail account.
 2. Create an **App Password** (Google Account → Security → App passwords).
-3. In `.env`, set:
+3. In `.env`:
+
    ```
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_USER=youraddress@gmail.com
    SMTP_PASS=the-16-character-app-password
-   MAIL_FROM=Bright Smile Clinic <youraddress@gmail.com>
+   MAIL_FROM=Clinic Name <youraddress@gmail.com>
    ```
+
    The address in `MAIL_FROM` must be the same one as `SMTP_USER`. Gmail only
    lets you send as the account you signed in with, so a different address is
-   quietly replaced with yours rather than rejected. The name in front of it is
-   yours to choose — that is the part patients see in their inbox.
-4. Restart the app. Login codes and `.ics` calendar invites will now be emailed.
+   quietly replaced with yours rather than rejected. The **name** in front of it
+   is yours to choose — that is the part patients see in their inbox.
+
+4. Restart the app. Login codes and `.ics` calendar invites are now emailed.
 
 ---
 
-## What's running under the hood (for the curious)
+## What is running under the hood
 
 One command starts three pieces, in order:
 
-1. **Postgres** — the database (a container).
-2. **migrate** — applies the database schema and loads the clinic's data, then
-   exits.
-3. **app** — the website and booking logic, served at port 3000.
+1. **Postgres** — the database.
+2. **migrate** — applies the schema and loads the clinic's data, then exits.
+3. **app** — the website and booking logic, on port 3000.
 
-You never manage these individually; the start script and Docker coordinate them.
+The app is not allowed to start until migrate has finished successfully, so it
+can never come up against a database that is half-built.
