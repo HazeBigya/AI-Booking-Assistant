@@ -95,7 +95,11 @@ export async function handleChat(
   let totalTokens = 0;
   try {
     const result = await runChat(messages, ctx);
-    reply = validateOutput(result.reply);
+    // A patient in the clinic's own zone has no second time, so any sentence
+    // about their local time was invented rather than converted.
+    reply = validateOutput(result.reply, {
+      sameTimeZone: !patientTimeZone || patientTimeZone === CLINIC.timeZone,
+    });
     totalTokens = result.totalTokens;
   } catch (err) {
     // One actionable line rather than a minified stack, and a reply that does
