@@ -184,6 +184,10 @@ real, use a Gmail account:
    SMTP_PASS=the-16-character-app-password
    MAIL_FROM=Bright Smile Clinic <youraddress@gmail.com>
    ```
+   The address in `MAIL_FROM` must be the same one as `SMTP_USER`. Gmail only
+   lets you send as the account you signed in with, so a different address is
+   quietly replaced with yours rather than rejected. The name in front of it is
+   yours to choose — that is the part patients see in their inbox.
 4. Restart the app. Login codes and `.ics` calendar invites will now be emailed.
 
 ---
