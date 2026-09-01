@@ -1,4 +1,4 @@
-# Setup Guide — Front Desk, an AI clinic receptionist
+# Setup Guide — AI Booking Assistant, an AI clinic receptionist
 
 Written for someone who has **not** run a developer project before. Follow it top
 to bottom. About **15 minutes**, most of it waiting for downloads. You end with

@@ -1,5 +1,7 @@
 import { handleChat } from "@server/services/chat-service";
 import { getOrCreateChatSession } from "@server/db/queries/chat";
+import { getUsageCounts } from "@server/db/queries/usage";
+import { checkUsage } from "@server/domain/usage/limits";
 import { rateLimit } from "@server/shared/rate-limit";
 
 export interface ControllerResult {
@@ -26,6 +28,22 @@ export async function chatController(input: {
   }
 
   const sessionId = await getOrCreateChatSession(input.chatSessionId);
+
+  // The per-minute limit above stops a burst; this stops a slow drip that runs
+  // all day. Checked before the model is called, so a blocked turn costs the
+  // clinic nothing at the AI provider.
+  const usage = checkUsage(await getUsageCounts(sessionId, input.authedEmail));
+  if (!usage.allowed) {
+    console.warn(`[usage] blocked by the ${usage.scope} daily cap (session ${sessionId})`);
+    // 200, not 429: this is a real answer for the patient to read, not an error
+    // for the browser to retry. The conversation continues; this turn does not
+    // reach the model.
+    return {
+      status: 200,
+      body: { reply: usage.message, totalTokens: 0 },
+      chatSessionId: sessionId,
+    };
+  }
 
   try {
     const { reply, totalTokens, authenticateAs } = await handleChat(sessionId, message, {

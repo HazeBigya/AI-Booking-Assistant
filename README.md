@@ -1,4 +1,4 @@
-# Front Desk — an AI clinic receptionist
+# AI Booking Assistant — an AI clinic receptionist
 
 An assistant that does the job of a front desk: it holds a natural conversation
 by text or by voice, understands what someone meant through typos and
