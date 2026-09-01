@@ -1,12 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { chatController } from "@server/controllers/chat-controller";
-import { SESSION_COOKIE, createSessionToken, readSessionToken } from "@server/auth/session";
+import { SESSION_COOKIE, createSessionToken } from "@server/auth/session";
+import { readVerifiedSession } from "@server/auth/verified-session";
 import { CHAT_SESSION_COOKIE } from "@server/db/queries/chat";
 import { A_MONTH, A_WEEK, sessionCookie } from "@server/shared/cookies";
 
 export async function POST(req: NextRequest) {
   const clientKey = req.headers.get("x-forwarded-for") ?? "local";
-  const session = await readSessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
+  // Verified against the patients table, not just the signature, so a token that
+  // outlived its patient row does not make the model treat someone as logged in.
+  const session = await readVerifiedSession(sessionToken);
   const chatSessionId = req.cookies.get(CHAT_SESSION_COOKIE)?.value;
 
   let payload: unknown = null;
@@ -24,6 +28,11 @@ export async function POST(req: NextRequest) {
   });
 
   const res = NextResponse.json(result.body, { status: result.status });
+
+  // Stale token: signed by us, but the patient it names is gone.
+  if (sessionToken && !session && !result.authenticateAs) {
+    res.cookies.delete(SESSION_COOKIE);
+  }
 
   // Persist the chat session (anonymous conversation identity) so refresh keeps history.
   if (result.chatSessionId) {

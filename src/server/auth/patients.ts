@@ -34,3 +34,16 @@ export async function knownPatientName(email: string): Promise<string | undefine
 export async function setPatientName(email: string, name: string): Promise<void> {
   await db.update(patients).set({ name: name.trim() }).where(eq(patients.email, email));
 }
+
+// Cheap existence check. The session token is self-contained and stays valid
+// for 7 days, so it can outlive the row it refers to — after `npm run destroy`,
+// or a restore from an older backup. Without this the app would show someone as
+// logged in as a patient the clinic no longer has.
+export async function patientExists(email: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: patients.id })
+    .from(patients)
+    .where(eq(patients.email, email))
+    .limit(1);
+  return rows.length > 0;
+}

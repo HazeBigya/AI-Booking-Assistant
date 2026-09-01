@@ -189,6 +189,12 @@ they verify their email again.
 The code lasts 10 minutes and works once. I never store the code itself, only a
 scrambled version, so the table it lives in is useless to anyone who reads it.
 
+The token is also checked against the patient list on every request, not just
+for a valid signature. A token stays valid for 7 days on its own, so it can
+outlive the patient it names — after the database is wiped, or restored from an
+older backup. Without that check the app would show somebody as logged in as a
+patient the clinic no longer has.
+
 **Letting anyone chat has a cost.** If nobody logs in, anyone can spend the
 clinic's AI budget. A per-minute limit is not enough on its own: 20 a minute,
 run all day by a script, is about 28,800 messages. So there are two daily caps:
