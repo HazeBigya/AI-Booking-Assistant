@@ -17,6 +17,15 @@ physiotherapy or optometry front desk is the seed data and one word in
 > guide with separate macOS and Windows paths (install Node + Docker, add one
 > key, start it).
 
+## Documentation
+
+- **[docs/internal.md](./docs/internal.md)** — the technical write-up: architecture,
+  the eight tools, how it stays correct, security, cost, and what was left out and
+  why. Styled **PDF** and **Word** versions sit beside it (`docs/internal.pdf`,
+  `docs/internal.docx`) for sharing.
+- **docs/external.md** — a plain guide for the clinic: what it does and how to run
+  it. *In progress.*
+
 ## Requirements
 
 | Need | Version | Why |
