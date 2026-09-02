@@ -1,49 +1,39 @@
-# AI Booking Assistant — internal documentation
+# AI Booking Assistant Internal Documentation
 
 # 1. Architecture
 
-## 1.1 Core Idea
-
-**The AI model never decides anything that must be correct.**
-
-The model has two jobs. It understands what the patient wants, and it picks which
-function to call. Then it writes the answer as a sentence.
-
-Normal code and the database decide everything else: free times, prices, which
-dentist can do which treatment, double bookings, past dates, and who the patient
-is.
-
-This is why the choice of AI model is a cost question and not a safety question.
-A cheap model writes worse sentences. It cannot make a wrong booking.
-
-The outside services sit at the edge, and the booking rules in the middle touch
-none of them. This is called ports and adapters. Changing supplier is a settings
-change, not a code change — section 1.4 lists which settings.
-
-## 1.2 Tech Stack
+## 1.1 Tech Stack
 
 | Part | Choice |
 |---|---|
-| Language | TypeScript 5 |
-| Runtime | Node.js 20 or newer |
-| Framework | Next.js 14 |
-| Database | PostgreSQL 16 |
-| Database code | Drizzle, with drizzle-kit for migrations |
-| Validation | Zod |
+| Language and runtime | TypeScript 5 on Node.js 20 or newer |
+| Framework and interface | Next.js 14 (App Router), React 18, Tailwind CSS |
+| Database | PostgreSQL 16 with Drizzle (drizzle-kit for migrations) |
 | Email | Nodemailer for SMTP, Resend as the alternative |
-| AI | one client for every OpenAI-compatible vendor, plus native clients for Google and AWS |
-| Tests | Vitest, 207 tests |
-| Packaging | Docker and Docker Compose |
+| AI | one client for every OpenAI-compatible vendor, plus native Google and AWS |
+| Tests and packaging | Vitest (211 tests), Docker and Docker Compose |
+
+## 1.2 Rules I followed
+
+A few standard software principles guided the build. In plain words:
+
+| Principle | What it means |
+|---|---|
+| **Separation of concerns** | Each part does one job and does not reach into the others. The booking rules do not touch the AI, the email or the web page |
+| **Do not repeat yourself (DRY)** | Write a thing once. One place talks to every AI company, one place sends every request from the browser |
+| **Keep it simple (KISS)** | Pick the plain option. Fewer settings and fewer moving parts means fewer things to get wrong |
+| **You are not going to need it (YAGNI)** | Do not build for a future nobody asked for. What I left out on purpose is section 6 |
+| **Depend on a shape, not on a supplier** | Talk to a small agreed interface, not a named company. Then swapping the AI or email company is a settings change, not a rewrite (section 1.4) |
 
 ## 1.3 The App Structure
 
-The app has three parts:
+The app has three folders, and each one has a single job:
 
-| Part | Job |
-|---|---|
-| The screen | What the patient sees. Runs in their browser |
-| The connector | Turns a web address into a function call |
-| The backend | The rules, the AI, the database |
+| Folder | Name | Job |
+|---|---|---|
+| `src/client` | the front end | What the patient sees. Runs in their browser |
+| `app/api` | the connector | Turns a web address into a function call |
+| `src/server` | the backend | The rules, the AI, the database |
 
 A message travels like this:
 
@@ -51,44 +41,34 @@ A message travels like this:
 the patient types and sends
       │
       ▼
-the screen  →  one file that sends the request  →  POST /api/chat
-                                                        │
-                                                        ▼
-                                    the connector: who is logged in? what did they say?
-                                                        │
-                                                        ▼
-                                    the backend: check, ask the AI, run the tools
-                                                        │
-                                                        ▼
-                                                    PostgreSQL
+the front end  →  src/client/api/http.ts  →  POST /api/chat
+                                                  │
+                                                  ▼
+      the connector (app/api/chat/route.ts): who is logged in? what did they say?
+                                                  │
+                                                  ▼
+      the backend (src/server): check, ask the AI, run the tools
+                                                  │
+                                                  ▼
+                                              PostgreSQL
 ```
 
-Three things are worth knowing about this shape.
+Three things about this shape:
 
-**The connector does no thinking.** It reads who is logged in, hands the message
-to the backend, and sends the answer back. Every rule lives behind it. This is
-why there are eight small connector files instead of one large one.
+**The connector does no thinking.** It checks who is logged in, hands the message
+to the backend, and returns the answer. Every rule lives behind it.
 
-**One file talks to the server.** The screen never contacts the backend directly.
-Everything goes through a single file, so changing how requests are sent means
-changing one place.
+**The front end never touches the database.** It only sends web requests, all
+through one file (`http.ts`), except voice, which has its own client for audio.
 
-**The website and the backend are one program.** In Next.js a folder named
-`api/chat` automatically becomes the web address `/api/chat`. So there is no
-separate list of addresses to keep in step with the code — the folders are the
-list, and they cannot fall out of date. This is why there is no second server
-program to install, start and monitor.
+**Front end and backend are one project.** In Next.js a file at
+`app/api/chat/route.ts` becomes the URL `/api/chat` on its own. So there is one
+project to deploy, one shared address (no cross-server permissions), and shared
+TypeScript types that break the build if the two sides ever disagree.
 
-Two useful consequences.
-
-The first screen is built on the server and arrives as a finished page. After
-that the conversation runs in the browser and only sends short messages back and
-forth. The page never reloads while the patient is talking.
-
-The keys stay on the server. The AI key, the database password and the mail
-password are only ever read by the backend, so they are never sent to the
-patient's browser. I checked the built browser files to confirm it: none of them
-contain a key, a tool name, or any database code.
+The keys stay on the server: the AI key, the database password and the mail
+password are only ever read by the backend, never sent to the browser. I checked
+the built browser files, no key, tool name or database code in any of them.
 
 ## 1.4 Agnostic AI design
 
@@ -97,8 +77,14 @@ The product is not tied to any AI company.
 **Any provider works.** The model sits behind one interface. Most AI companies
 copy the OpenAI message format, so a single adapter already covers OpenAI,
 Anthropic, DeepSeek, Gemini and OpenRouter. Each is a row in a table holding its
-address, its key name and a default model. Only Amazon Bedrock needs its own
-adapter, because it has no compatible format.
+address, its key name and a default model, so adding a company like that is a new
+row, not new code. `custom` reaches any other compatible company by setting its
+address.
+
+Two have their own adapter. Amazon Bedrock, because it has no compatible format
+at all and uses AWS credentials instead of a key. And `gemini-native`, which
+talks to Google directly; it sits next to the compatible `gemini` row, so Google
+can be reached either way.
 
 Changing supplier is a settings change:
 
@@ -136,90 +122,59 @@ with no key is skipped at startup with a warning rather than crashing the app.
 
 ## 1.5 The eight tools
 
-These eight functions are the only actions in the whole system. The model cannot
-touch the database, the internet, or the files. It can only ask for one of these
-to run, and everything it says to a patient comes from one of them.
+These eight functions are the only things the model can do. It cannot touch the
+database, the internet or the files directly.
 
-| Tool | What it takes | What it does |
+| Tool | Takes | Does |
 |---|---|---|
-| `list_services` | nothing | Returns every treatment, with price and duration |
-| `get_professionals_for_service` | service name | Returns the dentists who can do that treatment |
-| `check_availability` | service, dentist, day | Returns that dentist's free times. Times already gone, and times the patient is busy, are removed first |
-| `request_login_code` | email | Sends a 6-digit code to that address |
-| `verify_login_code` | email, code | Checks the code and logs the patient in |
-| `get_my_appointments` | nothing | Returns the logged-in patient's own appointments |
-| `create_booking` | service, dentist, start time, name | Books the time and sends both calendar invitations |
-| `cancel_booking` | booking id | Cancels one of the patient's own bookings |
+| `list_services` | none | All treatments, with price and length |
+| `get_professionals_for_service` | service | Dentists who do that treatment |
+| `check_availability` | service, dentist, day | That dentist's free times (past and patient-busy times removed) |
+| `request_login_code` | email | Emails a 6-digit code |
+| `verify_login_code` | email, code | Checks the code, logs the patient in |
+| `get_my_appointments` | none | The logged-in patient's appointments |
+| `create_booking` | service, dentist, time, name | Books it, emails the patient an invite naming both people |
+| `cancel_booking` | booking id | Cancels the patient's own booking |
 
-When `check_availability` finds no free times it also says **why**: the clinic is
-closed, it is too late today, the patient already has something booked, or the
-dentist is fully booked. Without that, the assistant would say "fully booked" for
-all four, and three of those would be a lie.
-
-`get_my_appointments` takes no email on purpose. The email comes from the login
-cookie, so the model has no way to name another patient.
-
-Anything not on this list cannot happen, however the patient phrases it. Every
-value the model sends is checked before the function runs, because the model's
-output is untrusted input.
+Two details matter. When there are no free times, the tool says why, closed, too
+late today, patient already booked, or dentist full, so the assistant never says
+"fully booked" when that is not the reason. And `get_my_appointments` takes no
+email: it reads the email from the login cookie, so the model cannot ask about
+another patient. Every value the model sends is checked before the tool runs.
 
 ## 1.6 Who the patient is
 
-There is no login screen. The product should feel like talking to a
-receptionist, and nobody shows a password at the desk before asking a question.
-Anyone can open the page and start talking: what a treatment involves, what it
-costs, who does it, when there is a gap.
+There is no login screen. Like a real receptionist, anyone can open the page and
+ask about treatments, prices, dentists or gaps. The patient only proves who they
+are at the moment it matters: booking, or viewing their own appointments.
 
-The patient only has to prove who they are at the moment it matters, which is
-booking or looking at their own appointments.
+**Email code, not a password.** A booking ends with a calendar invite (`.ics`),
+which only works if the email is real. So instead of a password, the patient gets
+a 6-digit code by email and types it back, one check that proves the address
+works. A password would only prove they remember a secret.
 
-**Why email, and not a password.** A booking ends with a calendar invitation.
-It is sent as a `.ics` file, so it goes straight into Apple Calendar, Google
-Calendar or Outlook. That only works if the address is real. So instead of a
-password, the patient gets a 6-digit code by email and types it back. One check,
-and it proves the address works.
+The code lasts 10 minutes, works once, and is stored only as a hash, so the table
+is useless if read. After a correct code the browser holds a 7-day token, so
+booking again the same week asks nothing. The token is also checked against the
+patient list on every request, not just for a valid signature, otherwise it could
+outlive a patient the clinic has wiped or restored from an old backup.
 
-A password would prove something less useful. It proves the patient remembers a
-secret, not that the invitation will arrive.
-
-**They do this once.** After a correct code the browser holds a login token for
-7 days. A patient who books again the same week is asked nothing. After a week
-they verify their email again.
-
-The code lasts 10 minutes and works once. I never store the code itself, only a
-scrambled version, so the table it lives in is useless to anyone who reads it.
-
-The token is also checked against the patient list on every request, not just
-for a valid signature. A token stays valid for 7 days on its own, so it can
-outlive the patient it names — after the database is wiped, or restored from an
-older backup. Without that check the app would show somebody as logged in as a
-patient the clinic no longer has.
-
-**Letting anyone chat has a cost.** If nobody logs in, anyone can spend the
-clinic's AI budget. A per-minute limit is not enough on its own: 20 a minute,
-run all day by a script, is about 28,800 messages. So there are two daily caps:
+**Anyone chatting costs money.** Without login, anyone can spend the clinic's AI
+budget, and a per-minute limit alone still allows about 28,800 messages a day. So
+there are two daily caps:
 
 | Who | Cap | Counted by |
 |---|---|---|
-| Someone who has not verified | 30 messages a day | The chat cookie |
-| A verified patient | 100 messages a day | Their email, across all their devices |
+| Not verified | 30 messages a day | The chat cookie |
+| Verified patient | 100 messages a day | Their email, across all devices |
 
-The numbers come from how the product is actually used. A booking takes 6 to 8
-messages, and browsing before deciding takes 10 to 20. Both caps sit above that,
-because a limit that interrupts a real booking is worse than no limit at all.
+The counts come from the stored messages, not a counter in memory that a restart
+would reset. Both sit above real use (a booking is 6 to 8 messages), and at the
+cap the patient is asked to call the clinic, not shown an error.
 
-The counts are read from the messages already stored, not from a counter kept in
-memory. A counter in memory resets every time the app restarts, which would give
-an attacker a fresh budget on every restart.
-
-When a patient reaches a cap they are not shown an error or a number. They are
-asked to call the clinic.
-
-**What these caps do not stop.** Someone who has not verified is identified by a
-cookie, and they can clear it and start again with a fresh 30. So the caps stop
-mistakes and casual abuse, not a determined script. Stopping that needs a limit
-on the clinic's total for the day, which nobody can reset by clearing anything.
-That is in section 6.
+These caps stop mistakes and casual abuse, not a determined script, an unverified
+user can clear the cookie for a fresh 30. The real fixes (a clinic-wide cap, a
+provider spend limit, a human check, an IP limit at a proxy) are in section 6.
 
 ## 1.7 Conversation history
 
@@ -237,42 +192,22 @@ model more text to get lost in.
 
 ## 1.8 Why PostgreSQL and Drizzle
 
-The data is relational. A booking belongs to a patient, points at a dentist, and
-is for a treatment; a dentist can do some treatments and not others. That is
-rows, columns and links between them — which is exactly what a relational
-database is built for.
+The data is relational: a booking links a patient, a dentist and a treatment, and
+a dentist only does some treatments. That is rows and links, which is what a
+relational database is for, so not a document store like MongoDB, which is
+better when the data has no fixed shape.
 
-**Why not MongoDB.** Mongo is good when the shape of the data varies and the
-links are few. Here the shape never varies and the links are the whole product.
-Storing a booking as a document means the rule "this dentist can do this
-treatment" lives in my code instead of in the database, and any bug in my code
-becomes bad data.
+Between the relational ones I picked PostgreSQL over MySQL for one reason:
+Postgres can refuse two overlapping bookings for the same dentist by itself. If
+two patients tap "book" in the same second, my own code might let both through,
+but the database checks at the moment it writes, one write at a time, so the
+second one is rejected. Double booking is the one mistake this product cannot
+make. The rule is one line, in `drizzle/0001_double_booking_guard.sql`.
 
-**Why not MySQL.** MySQL is relational too and would work. Postgres wins on one
-feature:
-
-```sql
-EXCLUDE USING gist (professional_id WITH =, tstzrange(start_time, end_time) WITH &&)
-  WHERE (status = 'booked')
-```
-
-This makes it *impossible* to store two overlapping bookings for the same
-dentist. Not "the code checks for it" — the database physically refuses. That
-matters when two patients click at the same second, where checking first is not
-enough. MySQL has no equivalent. Double booking is the one mistake a booking
-product cannot make, so that decided it.
-
-**Drizzle** sits between my code and the database so I write queries in
-TypeScript instead of assembling SQL strings. It is thin: the query I write looks
-like the SQL it sends, so nothing surprising happens in between. The types come
-from the table definitions, so renaming a column and forgetting to update a query
-breaks the build instead of a patient's booking.
-
-**A migration file** is a small, numbered file that records one change to the
-database shape — "add this column", "create this table". They are kept in the
-project and applied in order, so an empty database and a year-old one both end up
-with exactly the same structure. Without them, updating a live database means
-somebody typing commands by hand and hoping.
+**Drizzle and migrations.** Drizzle lets me write queries in TypeScript, and the
+types come from the table, so renaming a column and forgetting a query breaks the
+build, not a booking. Every change to the database shape is a small numbered
+file, applied in order, so a fresh database and an old one always match.
 
 ## 1.9 Email
 
@@ -280,68 +215,57 @@ Three ways to send email behind one interface, chosen automatically: SMTP if it
 is configured, otherwise Resend, otherwise the console. So the app runs with no
 email setup at all.
 
-The demo uses **Gmail SMTP**, chosen for its free tier. The professional services
-are more restrictive when you are not paying:
+The demo uses **Gmail SMTP**, because on a free account it is the only one that
+delivers a booking confirmation to any real patient. Resend only delivers to your
+own verified address until you verify a domain, and Mailgun's test mode only
+delivers to a few pre-approved addresses. Gmail sends to anyone, which is what the
+demo needed to show, but it is a personal mailbox with daily send limits.
 
-| Service | The limit on the free plan |
-|---|---|
-| Resend | Only delivers to your own verified address until you verify a domain |
-| Mailgun | Test mode only delivers to a few pre-approved addresses |
-| Gmail SMTP | Free and delivers to anyone, but it is a personal mailbox with daily limits |
-
-Neither free plan from a proper email service can send a booking confirmation to
-a real patient, which is exactly what needed demonstrating. Gmail could.
-
-**For production I would use Mailgun**, or Resend with a verified domain. Gmail
-is a personal mailbox: it has daily send limits and its deliverability is not
-designed for a business sending appointment confirmations. Moving is two
-settings and no code.
+**For production, Amazon SES is a cheap and reliable choice**, well under a dollar
+at this volume. If the traffic grows, or the clinic wants to send email campaigns
+as well as confirmations, Mailgun is built for that, with sending domains,
+delivery reports and reputation tools. Either move is two settings and no code.
 
 ---
 
 # 2. How it decides what to say
 
-The model receives the conversation and a description of the eight functions. It
-does **not** receive the clinic's data. To learn anything, it has to ask.
+The model gets the conversation and a list of the eight tools, but none of the
+clinic's data. To learn anything, it has to call a tool.
 
-1. Send the conversation and the function descriptions to the model.
-2. If the model asks for functions, run all of them and send back the results.
-3. Repeat until the model writes a normal sentence, or until 8 rounds are used.
+1. Send the conversation and the tool list to the model.
+2. If it asks for tools, run them and send back the results.
+3. Repeat until it writes a normal reply, or until 8 rounds are used.
 
-The answer is built in two steps. **The facts come from the code. The model only
-writes the sentence.**
+**The facts come from the code; the model only writes the sentence.** Asked "is Dr
+Chen free on Thursday?", it cannot guess, it calls `check_availability` and reads
+back the list. The 8-round limit stops a confused model calling tools forever at
+the clinic's expense.
 
-If a patient asks "is Dr Chen free on Thursday?", the model cannot guess or
-remember. It calls `check_availability`, gets a list of times, and reads it back.
+Two checks keep it honest. Facts are read the moment they are spoken, so nothing
+is out of date. And every reply is compared with what the tools returned, so a
+booking the model claims but never made never reaches the patient.
 
-The 8-round limit matters: without it, a confused model could call functions over
-and over at the clinic's expense.
+**No second AI checks the first.** That would be one guessing model checking
+another, at double the cost. My check is plain code that already knows whether
+`create_booking` saved a row, a fact beats an opinion, and it is cheaper. A judge
+model only earns its place offline, grading tone over old conversations before a
+model switch (section 6), not on every reply.
 
-## How it stays correct
+## 2.1 Problems I ran into, and how I fixed them
 
-Facts are read at the moment they are spoken. There is no saved copy of the
-schedule that can go out of date.
+Each time, the lesson was the same: a rule the model keeps breaking belongs in the
+code, not in a longer prompt.
 
-Before any message is sent, I compare the sentence with what the tools actually
-returned. If the model confirms a booking that never happened, that message never
-reaches the patient.
-
-Some rules live in the code instead of the instructions. These are the ones the
-model kept breaking:
-
-| The model kept doing this | Now stopped by |
-|---|---|
-| Offering times when the clinic is closed | A check in the booking rules |
-| Saying a booking was made when it was not | The reply is compared with the tool results |
-| Writing emojis and code | The output check removes them |
-| Inventing "that is also 9:00 AM in your time zone" | Removed when the patient is in the clinic's time zone |
-
-The last line taught me the most. I wrote that rule in the instructions three
-times and the model broke it three times. Each rule I wrote described the exact
-wording I had just seen, and the model then used different wording.
-
-**A rule the model keeps breaking belongs in the code, not in longer
-instructions.**
+| Problem | Cause | Fix |
+|---|---|---|
+| Asked for **Dr John**, booked **Dr Kate** | The tool took the dentist's id number, and the model sent the wrong one | The tool takes the dentist's **name** now; the server looks up the id |
+| Asked for **9:00**, booked at **2:45pm** | Clinic runs on Kathmandu time (UTC+5:45); "09:00Z" is 14:45 there, and the check only saw open and close hours | Reject any time the clinic does not actually offer, and tell the model to copy a time from the list |
+| Confirmed a booking that never happened | The model wrote "you're booked" with nothing behind it | The reply is checked against the tool results and blocked if unbacked |
+| "Cancel Thursday, book Friday" did only half | A "one question per reply" rule was read as "one thing per message" | Reworded the rule; gave the loop two more rounds |
+| Offered times when the clinic was closed | The model guessing hours | A check in the booking rules |
+| Wrote emojis and code in a spoken reply | The model formatting like a chat app | The output check strips them |
+| Added "that is also 9:00 AM in your local time" | Patient in the clinic's own zone, so it wrote the same time twice | Removed when patient is in the clinic zone, the one I fought three times, which taught the lesson above |
 
 ---
 
@@ -353,7 +277,6 @@ instructions.**
 | All AI providers are down | The patient reads "I can't reach the booking assistant". Never an error page |
 | A tool gets bad values | Tools never crash. They return an error the model can read and correct. A crash would end the conversation |
 | The model repeats itself forever | The loop stops after 8 rounds and returns a fixed message |
-| A supplier changes the rules | One model started refusing every message because it does not accept functions while "reasoning" is on. The adapter now retries with reasoning off, but only when the API says that is the problem. I read the API's error instead of keeping a list of model names, because such a list is out of date the day I write it |
 | The voice key is missing | The microphone turns off and the message names the setting to add. It does not fall back to the robotic voice built into the browser, because that would deliver the rejected thing while looking like it works |
 
 ---
@@ -366,7 +289,7 @@ Five layers, and only the first is made of words.
 the weakest layer and I treat it that way.
 
 **2. The tools are the only actions.** See section 1.5. This is why "ignore your
-instructions" does not work — there is nothing else for the model to become.
+instructions" does not work, there is nothing else for the model to become.
 
 **3. Identity comes from the login cookie, never from the model.** The request
 the browser sends contains the message and nothing about who is sending it. The
@@ -389,7 +312,7 @@ Five things are safe on a laptop and unsafe on the internet:
 - There is no HTTPS. A reverse proxy with a free certificate goes in front.
 - Voice does not work at all without HTTPS, because browsers block the
   microphone on insecure pages. So the previous point is not only about
-  security — without it a feature is missing.
+  security, without it a feature is missing.
 
 ### What I do not defend against
 
@@ -406,62 +329,113 @@ was booked, so the mistake is visible rather than hidden.
 
 | | |
 |---|---|
-| Time | 8 working days (22–31 August 2026) |
-| Commits | 70 |
-| Application code | about 6,100 lines |
-| Test code | about 2,200 lines, 207 tests |
+| Time | 22 August to 3 September 2026 |
+| Commits | 73 |
 
-A quarter of the code is tests. They cover the booking rules, the output guards,
-every provider failure path, the usage caps, and the voice layer. None of them need a database,
-an API key or a network connection, so the whole suite finishes in 1.3 seconds —
-which is what made it practical to keep changing the booking rules late in the
-project.
+Here is a real scenario. The clinic gets **50 patients a day**, every one of them
+has a full conversation with the assistant, and it runs every day of the month.
 
-## To run — 50 patients per day
+**The server.** I would host it on one **AWS EC2 `t4g.medium`** (2 CPU, 4 GB of
+memory). That is enough for this load with room to spare, and it is the cheapest
+instance that comfortably runs the app and the database together. The server bill
+does not move with how busy the clinic is:
 
-*Server: AWS EC2, us-east-1, on-demand prices, checked September 2026.*
+*AWS EC2, us-east-1, on-demand prices, checked September 2026.*
 
 | | $ per month |
 |---|---|
-| `t4g.medium` — 2 CPU, 4 GB memory | 24.53 |
+| `t4g.medium` (2 CPU, 4 GB memory) | 24.53 |
 | 30 GB disk | 2.40 |
-| Email | 0–20 |
-| **Fixed total** | **about 27–47** |
+| Email (Amazon SES) | under 1 |
+| **Server total** | **about 27** |
 
-For the AI cost I am using measured numbers. The system recorded token usage for
-every message during the whole project. The middle value is 8,900 tokens per
-message, and about 94% of that is input, because the instructions, the function
-descriptions and the last 15 messages are sent every time while the reply is only
-two sentences.
+Email barely registers at this size. The clinic sends a login code and a booking
+confirmation per patient, so about 3,000 to 4,000 emails a month. The app already
+supports three real services, so this is a choice, not new code. Prices are as of
+September 2026 and the two outside AWS change often:
+
+| Service | How it charges | This clinic (~3–4k / month) |
+|---|---|---|
+| **Amazon SES** | $0.16 per 1,000, no monthly fee | **under $1** |
+| **Resend** | free up to 3,000 a month, then about $20 a month for 50,000 | **$0 to $20** |
+| **Mailgun** | paid plans from about $15 a month (10,000), about $35 for 50,000 | **about $15** |
+
+**My pick is Amazon SES.** The clinic is already on AWS, so SES needs no new
+account and no new bill, it authenticates with the same AWS credentials the
+server already has, and at this volume it is under a dollar. Resend is the easiest
+to wire up and is what I would reach for outside AWS, but its free tier stops at
+3,000, just under this clinic's volume.
+
+**As the load grows, Mailgun becomes the better one.** Its flat plans include the
+deliverability tooling, sending domains, reputation monitoring, retries and
+detailed logs, that a clinic sending tens of thousands of confirmations a month
+actually needs, and at that size the flat fee is cheaper per email than SES's
+per-message rate. So: SES now for cost and easy integration, Mailgun later if the
+volume climbs. The demo itself uses Gmail, for the reason in section 1.9.
+
+**The AI brain.** This moves with use, and it is measured, not guessed: the median
+message is 8,900 tokens, **94% of it input**, because the instructions and recent
+history are re-sent every time while the reply is two sentences.
 
 ```
 50 conversations per day × 30 days  =  1,500 per month
 1,500 × 6 messages × 8,900 tokens   ≈  80 million tokens per month
+                                     ≈  75M input  +  5M output
 ```
 
-| Model for the brain | AI per month | Total with server |
+I ran the demo on **OpenAI** for both the brain and the voice. The brain can be
+any of these, and the same product costs very differently on each. Prices below
+are the published per-token rates as of September 2026 and they change often, so
+treat them as the shape of the answer, not the exact cent:
+
+| Brain | Example model | AI per month | With server |
+|---|---|---|---|
+| **Cheap** | DeepSeek-V3, or Google Gemini Flash | about $10–15 | **about $40** |
+| **Cheap (OpenAI)** | GPT-4o-mini (what I tested with) | about $15 | about $45 |
+| **Low-middle** | Anthropic Claude Haiku | about $80 | about $110 |
+| **Middle (OpenAI)** | GPT-4o | about $240 | about $270 |
+| **Middle (Anthropic)** | Claude Sonnet | about $300 | about $330 |
+| **Top** | Claude Opus | about $1,490 | about $1,520 |
+
+Two takeaways. The server is under 10% of the bill on anything above the cheapest
+brain, so the real cost choice is one line in the settings file, and correctness
+does not change down the column, because the model is not what decides. Most of
+the spend is the 94% of identical text sent every message; OpenAI, the brain I
+tested, caches that on its own at about half price and the app already sends it
+unchanged at the front, so the tested setup already saves (turning caching on
+fully for the other companies is the first item in section 6). **Voice**, if
+switched on, is a separate bill, per minute of speech in, per character out. I
+tested it with OpenAI (Whisper to listen, tts-1 to speak); Deepgram and ElevenLabs
+are the alternative, ElevenLabs giving a more natural voice at a higher price.
+Rates below are as of September 2026 and change often:
+
+| Part | Supplier | Rate | Per voiced conversation |
+|---|---|---|---|
+| Speech → text | OpenAI Whisper (tested) | about $0.006 / minute | ~2 min ≈ $0.012 |
+| | Deepgram | about $0.007 / minute | ~2 min ≈ $0.015 |
+| Text → speech | OpenAI tts-1 (tested) | about $0.015 / 1,000 characters | ~900 chars ≈ $0.014 |
+| | ElevenLabs | about $0.15–0.20 / 1,000 characters | ~900 chars ≈ $0.15 |
+
+The supplier choice swings this a lot:
+
+| Voice stack | Per voiced conversation | All 1,500 a month |
 |---|---|---|
-| A cheaper model, like DeepSeek | about $14 | **about $45** |
-| A middle model | about $300 | about $330 |
-| A top model | about $1,490 | about $1,520 |
+| OpenAI (what I tested) | about $0.03 | **about $40** |
+| Deepgram + ElevenLabs | about $0.17 | **about $250–300** |
 
-The server cost is small next to the AI cost. On anything above the cheapest
-model the server is under 10% of the bill, so the real cost decision is one line
-in the settings file — and correctness does not change between those rows,
-because the model is not the thing that decides.
-
-Voice, if it is on, is charged per minute of audio and becomes the bigger cost if
-patients use it a lot. Token prices change often, so what matters is not the
-exact numbers but that one model can cost 100 times more than another for the
-same product.
+So on the cheaper stack voice adds about as much as a cheap brain; on the
+ElevenLabs stack it adds as much as a middle brain and can double the whole bill.
+That is why voice is a setting the clinic turns on, not something always running.
+ElevenLabs in particular bills by subscription credits rather than pure usage, so
+its real number depends on the plan; the figure here is the pay-as-you-go shape.
 
 ## To maintain
 
-The suppliers change more often than the code does. Three real examples: one
-model refused to use functions while "reasoning" was on, one voice company
-refuses its best-known voice on free accounts, and model names change between
-releases. I handled all three the same way — read the error the API sends,
-instead of keeping my own list of model names.
+The suppliers change more often than the code does. A model gets renamed, a free
+plan starts refusing a voice it used to allow, a company changes what it expects.
+I handle all of it the same way: read the error the company sends back and react
+to that, instead of keeping my own list of model names and settings that goes
+stale the day I write it.
 
 Normal maintenance is updating libraries and checking prices. Nothing runs in the
 background that needs watching, and the database is the only thing holding data,
@@ -475,11 +449,11 @@ These were decisions, not mistakes.
 
 | Not built | Reason |
 |---|---|
-| **Prompt caching** | The most valuable item here. About 94% of the cost is text that is identical every time, and most AI companies will store that text and charge about 10% for it. On a middle model that is about $140 a month instead of about $300 |
-| **A daily cap for the whole clinic** | The two caps in section 1.6 are per caller, and someone who has not verified can clear their cookie to reset their own. A cap on the clinic's total for the day is the one nobody can reset, and it is what would turn an unbounded bill into a bounded outage. Left out to keep the rule simple |
-| **Shared burst limiting** | The daily caps are counted from the database, so they survive a restart and work across several servers. The 20-a-minute burst limit is still held in memory and keyed on a header the caller can set, so it is per-server and can be faked. Behind a reverse proxy that is fine. On its own it is not. Redis is the path |
-| **Changing an appointment** | Today the patient cancels and books again in one conversation. A real change would move the booking and keep its calendar id, so the existing invitation updates instead of being replaced |
-| **Interrupting the voice** | Speaking over the assistant needs two-way streaming through the whole loop. That is a different design, not a setting. What I built instead: the turn ends automatically after 1.6 seconds of silence |
-| **Calendar accounts** | The calendar invitation works with no accounts connected. Automatic acceptance would need every dentist to connect their calendar, and the clinic would have to keep those credentials |
-| **A screen for clinic data** | Dentists, treatments and prices come from a file in the code. A clinic cannot change them without a developer |
-| **Model quality testing** | Nothing measures how often a model picks the right dentist from an unclear sentence. That is the one quality that really changes between models, so it is worth measuring before switching model in production |
+| **Prompt caching, in full** | 94% of the cost is identical text every message. OpenAI (what I tested) caches it automatically, so the tested setup already saves; the small per-company marker for Anthropic and Gemini is left because it differs per company. Doing it everywhere is roughly $140 a month instead of $300 on a middle model |
+| **A clinic-wide daily cap** | The caps in section 1.6 are per caller, and an unverified user can clear their cookie to reset. A cap on the clinic's whole day is the one nobody can reset, it turns a runaway bill into a bounded outage |
+| **A shared limit counter (Redis)** | The per-minute limit is kept in each server's memory and trusts a value the browser can send. Redis, a fast store shared by all the servers, would hold the counts in one place the browser cannot touch. Fine behind one proxy today; Redis is for more than one server |
+| **Changing an appointment** | Today the patient cancels and rebooks. A real change would keep the calendar id so the existing invite updates instead of being replaced |
+| **Interrupting the voice** | Talking over the assistant needs two-way streaming, a different design. Instead, the turn ends after 1.6 seconds of silence |
+| **Calendar accounts** | The invite works with no accounts. Auto-acceptance would need every dentist to connect a calendar and the clinic to keep those credentials |
+| **A screen for clinic data** | Dentists, treatments and prices live in a code file; a clinic cannot change them without a developer |
+| **Model quality testing** | Nothing measures how often the model picks the right dentist from a vague sentence, worth checking before switching model in production |
