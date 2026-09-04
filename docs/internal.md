@@ -35,25 +35,7 @@ The app has three folders, and each one has a single job:
 | `app/api` | the connector | Turns a web address into a function call |
 | `src/server` | the backend | The rules, the AI, the database |
 
-A message travels like this:
-
-```
-the patient types and sends
-      │
-      ▼
-the front end  →  src/client/api/http.ts  →  POST /api/chat
-                                                  │
-                                                  ▼
-      the connector (app/api/chat/route.ts): who is logged in? what did they say?
-                                                  │
-                                                  ▼
-      the backend (src/server): check, ask the AI, run the tools
-                                                  │
-                                                  ▼
-                                              PostgreSQL
-```
-
-Three things about this shape:
+Three things about this structure:
 
 **The connector does no thinking.** It checks who is logged in, hands the message
 to the backend, and returns the answer. Every rule lives behind it.
@@ -230,6 +212,35 @@ delivery reports and reputation tools. Either move is two settings and no code.
 
 # 2. How it decides what to say
 
+By the time the AI runs, who the patient is already settled from the cookie
+(section 1.6) and the daily cap is checked. From there, two decisions keep the
+product safe: the AI can act **only** through validated tools, and a guard checks
+its words against what the tools actually did.
+
+```
+   patient message  (identity already known from the cookie)
+            │
+    ┌──▶ send to the AI model
+    │       │
+    │       ▼
+    │   wants a tool? ──no──▶ draft a reply ──┐
+    │       │                                 │
+    │      yes                                │
+    │       ▼                                 │
+    │   run the tool                          │
+    │   (plain code, validates                │
+    │    input, reads/writes DB)              │
+    │       │                                 │
+    └───────┘  add result, loop (max 8)       │
+                                              ▼
+              guard: every claim backed by a real tool result?
+                 │                              │
+                 no                             yes
+                 ▼                              ▼
+          block the claim                clean text, then reply
+          (booking never saved)          (strip emoji/markup for voice)
+```
+
 The model gets the conversation and a list of the eight tools, but none of the
 clinic's data. To learn anything, it has to call a tool.
 
@@ -250,7 +261,7 @@ booking the model claims but never made never reaches the patient.
 another, at double the cost. My check is plain code that already knows whether
 `create_booking` saved a row, a fact beats an opinion, and it is cheaper. A judge
 model only earns its place offline, grading tone over old conversations before a
-model switch (section 6), not on every reply.
+model switch, not on every reply.
 
 ## 2.1 Problems I ran into, and how I fixed them
 
@@ -391,7 +402,7 @@ treat them as the shape of the answer, not the exact cent:
 | Brain | Example model | AI per month | With server |
 |---|---|---|---|
 | **Cheap** | DeepSeek-V3, or Google Gemini Flash | about $10–15 | **about $40** |
-| **Cheap (OpenAI)** | GPT-4o-mini (what I tested with) | about $15 | about $45 |
+| **Cheap (OpenAI)** | GPT-5.6 Luna (what I tested with) | about $15 | about $45 |
 | **Low-middle** | Anthropic Claude Haiku | about $80 | about $110 |
 | **Middle (OpenAI)** | GPT-4o | about $240 | about $270 |
 | **Middle (Anthropic)** | Claude Sonnet | about $300 | about $330 |
@@ -399,11 +410,7 @@ treat them as the shape of the answer, not the exact cent:
 
 Two takeaways. The server is under 10% of the bill on anything above the cheapest
 brain, so the real cost choice is one line in the settings file, and correctness
-does not change down the column, because the model is not what decides. Most of
-the spend is the 94% of identical text sent every message; OpenAI, the brain I
-tested, caches that on its own at about half price and the app already sends it
-unchanged at the front, so the tested setup already saves (turning caching on
-fully for the other companies is the first item in section 6). **Voice**, if
+does not change down the column, because the model is not what decides. **Voice**, if
 switched on, is a separate bill, per minute of speech in, per character out. I
 tested it with OpenAI (Whisper to listen, tts-1 to speak); Deepgram and ElevenLabs
 are the alternative, ElevenLabs giving a more natural voice at a higher price.
@@ -445,15 +452,62 @@ so backups are the only real operations work.
 
 # 6. Risks and missing features
 
-These were decisions, not mistakes.
+These were decisions, not mistakes. Each one is a thing I understood and chose to
+leave for later, with a clear reason and a clear next step. I list them so whoever
+takes this on knows exactly what is here and what is not.
 
-| Not built | Reason |
-|---|---|
-| **Prompt caching, in full** | 94% of the cost is identical text every message. OpenAI (what I tested) caches it automatically, so the tested setup already saves; the small per-company marker for Anthropic and Gemini is left because it differs per company. Doing it everywhere is roughly $140 a month instead of $300 on a middle model |
-| **A clinic-wide daily cap** | The caps in section 1.6 are per caller, and an unverified user can clear their cookie to reset. A cap on the clinic's whole day is the one nobody can reset, it turns a runaway bill into a bounded outage |
-| **A shared limit counter (Redis)** | The per-minute limit is kept in each server's memory and trusts a value the browser can send. Redis, a fast store shared by all the servers, would hold the counts in one place the browser cannot touch. Fine behind one proxy today; Redis is for more than one server |
-| **Changing an appointment** | Today the patient cancels and rebooks. A real change would keep the calendar id so the existing invite updates instead of being replaced |
-| **Interrupting the voice** | Talking over the assistant needs two-way streaming, a different design. Instead, the turn ends after 1.6 seconds of silence |
-| **Calendar accounts** | The invite works with no accounts. Auto-acceptance would need every dentist to connect a calendar and the clinic to keep those credentials |
-| **A screen for clinic data** | Dentists, treatments and prices live in a code file; a clinic cannot change them without a developer |
-| **Model quality testing** | Nothing measures how often the model picks the right dentist from a vague sentence, worth checking before switching model in production |
+**A clinic-wide daily cap.** The two caps in section 1.6 are per caller: 30
+messages for an unverified visitor, 100 for a verified patient. Both stop honest
+mistakes and casual abuse, but an unverified visitor can clear the browser cookie
+and start a fresh 30. A cap on the clinic's whole day is the one nobody can reset.
+It turns a runaway bill into a bounded outage: once the day's budget is spent, new
+chats are asked to call the clinic instead of spending more. Next step: one shared
+daily counter, checked before every model call.
+
+**A shared limit counter (Redis).** The per-minute rate limit is held in each
+server's own memory, and it partly trusts a value the browser sends. On one server
+behind one proxy, which is today's setup, that is fine. The moment there are two
+servers, each keeps its own count and the limit leaks. Redis is a small fast store
+that all the servers share, holding the counts in one place the browser cannot
+touch. Next step: move both the per-minute limit and the daily caps into Redis
+when the app runs on more than one server.
+
+**Changing an appointment.** Today a patient who wants a different time cancels the
+booking and makes a new one. That works, but it throws away the first calendar
+invite and sends a second. A real reschedule would keep the original calendar id,
+so the invite already in the patient's calendar updates in place instead of being
+replaced by a new one. Next step: a `reschedule` tool that edits the existing row
+and re-sends the same invite id.
+
+**Interrupting the voice.** When voice is on, the patient waits for the assistant
+to finish speaking before they talk. Talking over it needs two-way audio streaming,
+which is a different and heavier design. Instead, the assistant ends its turn after
+1.6 seconds of silence, which is enough for a booking conversation. Next step:
+full-duplex streaming only if the clinic wants a more natural back and forth.
+
+**Faster voice replies.** With voice on, the reply feels slower than typing, and
+the reason is the shape of the pipeline. It runs three steps one after another and
+waits for each to finish: it turns the whole recording into text, sends that text
+to the brain and waits for the full reply, then turns the whole reply into speech
+before any sound plays. Each step is a separate request to an outside company, so
+the waits stack up, and on top of that the assistant first waits 1.6 seconds of
+silence to be sure the patient has stopped talking. Next step: stream the steps
+into each other, so speech starts playing as soon as the first words of the reply
+are ready instead of after the whole reply, and move to a faster voice model or a
+single speech-to-speech service that does listening, thinking and speaking in one
+stream. This is the change a patient would feel the most.
+
+**Connected staff calendars.** The patient gets a calendar invite that names both
+the patient and the dentist, and it works with no accounts connected. What is not
+built is writing the appointment straight into each dentist's own calendar
+automatically. That would need every dentist to connect their calendar once and
+the clinic to store those credentials safely. In the demo the dentists are example
+data, so only the patient is emailed; with real dentists and real emails, the same
+invite already goes to both. Next step: an OAuth connection per dentist, then write
+events to their calendar on booking and cancel.
+
+**A screen for clinic data.** The dentists, treatments, prices and opening hours
+live in a code file. Changing them needs a developer editing that file once. There
+is no admin screen for the clinic to do it themselves. This is the main thing a
+next version should add. Next step: move that data into the database and build a
+small settings page behind a staff login.
