@@ -10,6 +10,7 @@ import { CLINIC, addMinutes } from "@server/domain/booking/rules";
 import {
   formatZonedDate,
   formatZonedTime,
+  sameWallClock,
   sameZonedDay,
   zonedTimeToUtc,
 } from "@server/domain/booking/timezone";
@@ -208,7 +209,7 @@ export interface ToolContext {
 // Undefined keys are dropped by JSON.stringify, so a patient in the clinic's own
 // zone sees no extra field.
 function timeLabels(at: Date, ctx: ToolContext) {
-  const elsewhere = ctx.patientTimeZone && ctx.patientTimeZone !== CLINIC.timeZone;
+  const elsewhere = ctx.patientTimeZone && !sameWallClock(ctx.patientTimeZone, CLINIC.timeZone, at);
   return {
     time: formatZonedTime(at, CLINIC.timeZone),
     yourLocalTime: elsewhere ? formatZonedTime(at, ctx.patientTimeZone!) : undefined,
@@ -457,7 +458,8 @@ export async function runTool(
             date: formatZonedDate(result.booking.start, CLINIC.timeZone),
             time: clinicRange(result.booking.start, result.booking.end, CLINIC.timeZone),
             yourLocalTime:
-              ctx.patientTimeZone && ctx.patientTimeZone !== CLINIC.timeZone
+              ctx.patientTimeZone &&
+              !sameWallClock(ctx.patientTimeZone, CLINIC.timeZone, result.booking.start)
                 ? clinicRange(result.booking.start, result.booking.end, ctx.patientTimeZone)
                 : undefined,
           },
@@ -567,7 +569,8 @@ function describeAppointment(
   a: { id: number; service: string; dentist: string; title: string; start: Date; end: Date },
   ctx: ToolContext,
 ) {
-  const elsewhere = ctx.patientTimeZone && ctx.patientTimeZone !== CLINIC.timeZone;
+  const elsewhere =
+    ctx.patientTimeZone && !sameWallClock(ctx.patientTimeZone, CLINIC.timeZone, a.start);
   return {
     id: a.id,
     service: a.service,

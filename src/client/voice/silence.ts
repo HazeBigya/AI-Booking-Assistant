@@ -15,17 +15,20 @@ export interface SilenceOptions {
   noiseMargin?: number;   // how far above that floor speech has to be
 }
 
-// silenceMs is generous on purpose. 800ms is roughly the pause inside a fluent
-// native sentence, so it cut people off between clauses — and it punished
+// silenceMs is a balance, not a maximum. 800ms is roughly the pause inside a
+// fluent native sentence, so it cut people off between clauses — and it punished
 // exactly the patients least able to absorb it: anyone speaking a second
 // language, anyone elderly, anyone thinking about a date. Being interrupted
 // mid-question costs the whole question; waiting costs the wait, and the mic
 // button ends the turn immediately for anyone who does not want to wait at all.
-// 1600ms is the tightest value that still clears a hesitation of a second and a
-// half, which is the pause that prompted raising it in the first place.
+// 1600ms cleared even a second-and-a-half hesitation, but that long a gap after
+// every turn stops the exchange feeling like a conversation. 1200ms is the
+// compromise: it still clears a roughly one-second pause while taking 400ms off
+// every turn end. The mic button remains the escape hatch for anyone who needs
+// longer to finish a thought.
 export const DEFAULT_SILENCE: Required<SilenceOptions> = {
   threshold: 0.02,
-  silenceMs: 1600,
+  silenceMs: 1200,
   minSpeechMs: 300,
   maxMs: 30_000,
   noiseWindowMs: 300,

@@ -85,6 +85,18 @@ export function sameZonedDay(a: Date, b: Date, timeZone: string): boolean {
   return zonedDateKey(a, timeZone) === zonedDateKey(b, timeZone);
 }
 
+// Two zones show the same wall-clock time at `at` when their UTC offset matches
+// there. Comparing zone NAMES misses this: Asia/Taipei and Asia/Singapore are
+// two names for the same +08:00 clock, so a name compare treated a patient in
+// Singapore as "elsewhere" and produced a yourLocalTime identical to the clinic
+// time — the redundant "that's also 12:00 PM your local time" the guard exists
+// to stop. Whether a second time is worth showing is a question about the clock,
+// not the name.
+export function sameWallClock(a: string, b: string, at: Date = new Date()): boolean {
+  if (a === b) return true;
+  return offsetMsAt(at, a) === offsetMsAt(at, b);
+}
+
 // Formatted server-side so the model never does timezone arithmetic on an ISO
 // string — it gets that wrong.
 export function formatZonedTime(at: Date, timeZone: string): string {

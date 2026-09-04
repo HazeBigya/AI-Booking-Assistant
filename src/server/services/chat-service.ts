@@ -11,7 +11,12 @@ import {
 import { findOrCreatePatient } from "@server/auth/patients";
 import { classifyFailure, describeFailure } from "@server/sdk/ai/providers/failure";
 import { CLINIC } from "@server/domain/booking/rules";
-import { formatZonedDate, formatZonedTime, zonedDateKey } from "@server/domain/booking/timezone";
+import {
+  formatZonedDate,
+  formatZonedTime,
+  sameWallClock,
+  zonedDateKey,
+} from "@server/domain/booking/timezone";
 
 // Recent messages sent to the model. Deliberately short: the durable state of a
 // booking lives in Postgres, not in the transcript, so a fact from forty turns
@@ -98,7 +103,7 @@ export async function handleChat(
     // A patient in the clinic's own zone has no second time, so any sentence
     // about their local time was invented rather than converted.
     reply = validateOutput(result.reply, {
-      sameTimeZone: !patientTimeZone || patientTimeZone === CLINIC.timeZone,
+      sameTimeZone: !patientTimeZone || sameWallClock(patientTimeZone, CLINIC.timeZone),
     });
     totalTokens = result.totalTokens;
   } catch (err) {
@@ -135,7 +140,7 @@ function currentDateLine(patientTimeZone?: string): string {
     `clinic time zone ${CLINIC.timeZone}). Any time earlier than this today has ` +
     `already passed and cannot be booked.`;
 
-  if (patientTimeZone && patientTimeZone !== CLINIC.timeZone) {
+  if (patientTimeZone && !sameWallClock(patientTimeZone, CLINIC.timeZone)) {
     line +=
       ` This patient is in ${patientTimeZone}, where it is currently ` +
       `${formatZonedTime(now, patientTimeZone)}. All appointment times you state are ` +

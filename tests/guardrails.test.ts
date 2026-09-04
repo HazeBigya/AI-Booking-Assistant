@@ -36,6 +36,28 @@ describe("inventing the patient's local time", () => {
     ).toBe("Booked for 9:00 AM.");
   });
 
+  // The exact phrasings that leaked when the patient's zone had a different NAME
+  // from the clinic's but the same clock (e.g. Asia/Singapore vs Asia/Taipei).
+  // The gate is fixed in chat-service via sameWallClock; these pin that once the
+  // guard runs, the invented clause is removed for both a single time and a range.
+  it("removes 'that's also <time> your local time'", () => {
+    expect(
+      validateOutput(
+        "Oscar has an opening today at 12:00 PM, ending at 1:00 PM. That's also 12:00 PM your local time. Shall I book it?",
+        same,
+      ),
+    ).toBe("Oscar has an opening today at 12:00 PM, ending at 1:00 PM. Shall I book it?");
+  });
+
+  it("removes it when the time is a range", () => {
+    expect(
+      validateOutput(
+        "You're booked from 12:00 PM–1:00 PM. That's also 12:00 PM–1:00 PM your local time.",
+        same,
+      ),
+    ).toBe("You're booked from 12:00 PM–1:00 PM.");
+  });
+
   it("removes a whole sentence given over to it", () => {
     expect(
       validateOutput("Kate is free from 9:00 AM. These times are also your local time.", same),

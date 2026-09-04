@@ -94,25 +94,31 @@ describe("SilenceDetector", () => {
     expect(det.push(0.001, 300)).toBe("listening");
   });
 
-  // The pause someone takes mid-thought, or between clauses in a language they
-  // are still learning, must not be read as the end of their turn: being cut
-  // off loses the whole question, while waiting loses a second.
-  it("does not end the turn on a pause of a second and a half", () => {
+  // A short pause mid-thought — between clauses, or in a language someone is
+  // still learning — must not be read as the end of their turn: being cut off
+  // loses the whole question. 1200ms clears a roughly one-second hesitation; a
+  // longer gap ends the turn so the exchange stays conversational, and the mic
+  // button ends it sooner for anyone who does not want to wait.
+  it("does not end the turn on a pause of about a second", () => {
     const det = new SilenceDetector();
     expect(
       feed(det, [
         [0.2, 0],
         [0.2, 400],
         [0.001, 500],
-        [0.001, 1900],
+        [0.001, 1300], // 900ms after the last speech — still within the window
       ]),
     ).not.toBe("done");
     // Still the same turn once they carry on.
-    expect(det.push(0.2, 2000)).toBe("speaking");
+    expect(det.push(0.2, 1400)).toBe("speaking");
   });
 
-  it("defaults to a pause long enough for a hesitant speaker", () => {
-    expect(DEFAULT_SILENCE.silenceMs).toBeGreaterThanOrEqual(1500);
+  // The default balances two failure modes: too short cuts off hesitant
+  // speakers, too long leaves dead air after every turn and stops it feeling
+  // like a conversation.
+  it("defaults to a pause that clears a hesitation but keeps the exchange conversational", () => {
+    expect(DEFAULT_SILENCE.silenceMs).toBeGreaterThanOrEqual(1000);
+    expect(DEFAULT_SILENCE.silenceMs).toBeLessThanOrEqual(1300);
   });
 });
 

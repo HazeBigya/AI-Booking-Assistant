@@ -2,15 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { ConversationState } from "@client/components/chat/types";
-import { getVoiceConfig, speak, transcribe } from "./api";
+import { getVoiceConfig, speak, transcribe, voiceReply } from "./api";
 import { isCaptureSupported, startCapture, type Capture } from "./capture";
 import { PlaybackQueue } from "./playback";
-import { toSpeakable } from "./speakable";
+import { toSpeakable } from "@shared/speakable";
 
 interface Params {
-  // Receives the transcript and returns the assistant's reply, or null if the
-  // turn produced nothing to say.
-  onTranscript: (text: string) => Promise<string | null>;
+  // The spoken question, transcribed — shown as the patient's message before the
+  // reply streams in.
+  onUserSpeech: (text: string) => void;
+  // Fires once per sentence as it begins playing, with the reply revealed so far
+  // and whether this is the first sentence, so the caller can create the reply
+  // bubble and then grow it. Text is revealed in step with the voice.
+  onReplyChunk: (textSoFar: string, isFirst: boolean) => void;
+  // The spoken turn ended (played, failed, or empty) — e.g. to refresh the
+  // session if the patient verified their email in-chat this turn.
+  onReplyDone: () => void;
   setState: (state: ConversationState) => void;
   // Told when speech fails outright. The reply is on screen either way, so this
   // is not fatal — but silence with no explanation reads as a broken product,
@@ -18,7 +25,13 @@ interface Params {
   onError: (message: string) => void;
 }
 
-export function useVoice({ onTranscript, setState, onError }: Params) {
+export function useVoice({
+  onUserSpeech,
+  onReplyChunk,
+  onReplyDone,
+  setState,
+  onError,
+}: Params) {
   const [disabledReason, setDisabledReason] = useState<string | null>("Checking voice…");
   const [listening, setListening] = useState(false);
   // The reply currently being turned into audio, so the message it belongs to
@@ -123,6 +136,71 @@ export function useVoice({ onTranscript, setState, onError }: Params) {
     [onError, setState],
   );
 
+  // The spoken turn: one request that streams the reply's text and audio
+  // together, revealing each sentence as its clip plays so text and voice arrive
+  // at the same time. Contrast speakReply, which reads an ALREADY-shown reply
+  // aloud for the Listen button and so shows all its text up front.
+  const runVoiceTurn = useCallback(
+    async (message: string) => {
+      const run = ++speechRun.current;
+      setState("thinking"); // the model is working; nothing to show or say yet
+      const chunkTexts: string[] = [];
+
+      // Reveal sentence `index` and everything before it — driven by the queue as
+      // it reaches each clip, so the words appear in step with the voice.
+      const reveal = (index: number) => {
+        if (speechRun.current !== run) return;
+        const soFar = chunkTexts.slice(0, index + 1).join(" ");
+        onReplyChunk(soFar, index === 0);
+        setSpokenText(soFar); // keep the bubble's speaking indicator matching
+      };
+
+      const queue = new PlaybackQueue(
+        async (clip) => {
+          if (speechRun.current !== run) return;
+          setState("speaking");
+          await playBlob(clip, audioRef);
+        },
+        () => silence(audioRef),
+        reveal,
+      );
+      queueRef.current = queue;
+
+      try {
+        await voiceReply(message, (chunk) => {
+          if (speechRun.current !== run) return;
+          chunkTexts[chunk.index] = chunk.text;
+          queue.enqueue(
+            chunk.index,
+            chunk.audio
+              ? Promise.resolve(chunk.audio)
+              : Promise.reject(new Error("no audio for this sentence")),
+          );
+        });
+        await queue.whenDrained();
+      } catch (err) {
+        if (speechRun.current === run) {
+          onError(err instanceof Error ? err.message : "Something went wrong.");
+        }
+      } finally {
+        if (speechRun.current === run) {
+          const { played, failed } = queue.outcome();
+          // Text is on screen either way (reveal runs even when a clip fails);
+          // this only fires when nothing at all could be spoken, so the patient
+          // is told the reply is there to read rather than left in silence.
+          if (played === 0 && failed > 0) {
+            onError("I couldn't read that reply out loud — it's written above.");
+          }
+          queueRef.current = null;
+          setSpokenText(null);
+          onReplyDone();
+          setState("idle");
+        }
+      }
+    },
+    [onError, onReplyChunk, onReplyDone, setState],
+  );
+
   const toggle = useCallback(async () => {
     if (listening) {
       // Send what was said, do not discard it. Pressing the mic to finish is
@@ -156,9 +234,8 @@ export function useVoice({ onTranscript, setState, onError }: Params) {
             setState("idle"); // heard nothing worth sending to the model
             return;
           }
-          const reply = await onTranscript(text);
-          if (reply) await speakReply(reply);
-          else setState("idle");
+          onUserSpeech(text); // show what they said before the reply streams in
+          await runVoiceTurn(text);
         } catch {
           setState("idle");
         }
@@ -175,7 +252,7 @@ export function useVoice({ onTranscript, setState, onError }: Params) {
       setListening(false);
       setState("idle");
     }
-  }, [listening, onTranscript, setState, speakReply, stopSpeaking]);
+  }, [listening, onUserSpeech, runVoiceTurn, setState, stopSpeaking]);
 
   // Reading a reply aloud on request. A typed question is answered in text and
   // stays silent — someone who is reading did not ask to be talked at — but the

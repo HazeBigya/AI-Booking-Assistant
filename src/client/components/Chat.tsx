@@ -92,14 +92,23 @@ export function Chat() {
     }
   }
 
-  // Voice is bookends around the unchanged text pipeline: a transcript goes in
-  // through the same send() a typed message uses, and the reply comes back out
-  // through TTS. The `spoken` flag travels with it so the reply is written to be
-  // heard; everything between — tools, guards, the database — is identical.
+  // Voice runs the same guarded chat turn as typed chat, but through the
+  // streaming /api/voice/reply endpoint: the server sends each sentence's text
+  // and audio together. These callbacks show the patient's spoken words, then
+  // grow the reply bubble one sentence at a time, in step with the voice — the
+  // reply is never left on screen ahead of the sound.
   const voice = useVoice({
     setState,
-    onTranscript: (text) => send(text, true),
     onError: setError,
+    onUserSpeech: (text) => setMessages((prev) => [...prev, { role: "user", content: text }]),
+    onReplyChunk: (textSoFar, isFirst) =>
+      setMessages((prev) => {
+        if (isFirst) return [...prev, { role: "assistant", content: textSoFar }];
+        const copy = prev.slice();
+        copy[copy.length - 1] = { role: "assistant", content: textSoFar };
+        return copy;
+      }),
+    onReplyDone: () => refreshSession(), // they may have verified their email in-chat
   });
 
   return (

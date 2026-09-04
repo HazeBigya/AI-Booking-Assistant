@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatZonedTime,
   partsInZone,
+  sameWallClock,
   sameZonedDay,
   zonedDateKey,
   zonedTimeToUtc,
@@ -142,5 +143,24 @@ describe("the patient's time zone is untrusted client input", () => {
     expect(parseTimeZone({ timeZone: "  " })).toBeUndefined();
     expect(parseTimeZone({})).toBeUndefined();
     expect(parseTimeZone(null)).toBeUndefined();
+  });
+});
+
+// Whether to show a second "your local time" is a question about the clock, not
+// the zone name. Two names for the same offset must count as the same clock, or
+// the patient hears their time quoted back to them identically.
+describe("sameWallClock", () => {
+  it("is true for identical zones", () => {
+    expect(sameWallClock("Asia/Taipei", "Asia/Taipei")).toBe(true);
+  });
+
+  it("is true for different names that share an offset", () => {
+    // Both are +08:00 year-round (no DST) — same wall clock, different name.
+    expect(sameWallClock("Asia/Taipei", "Asia/Singapore")).toBe(true);
+  });
+
+  it("is false for genuinely different offsets", () => {
+    // Kathmandu is +05:45, Taipei +08:00 — a real second time worth showing.
+    expect(sameWallClock("Asia/Kathmandu", "Asia/Taipei")).toBe(false);
   });
 });

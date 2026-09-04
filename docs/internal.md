@@ -11,7 +11,7 @@
 | Database | PostgreSQL 16 with Drizzle (drizzle-kit for migrations) |
 | Email | Nodemailer for SMTP, Resend as the alternative |
 | AI | one client for every OpenAI-compatible vendor, plus native Google and AWS |
-| Tests and packaging | Vitest (211 tests), Docker and Docker Compose |
+| Tests and packaging | Vitest (216 tests), Docker and Docker Compose |
 
 ## 1.2 Rules I followed
 
@@ -276,7 +276,7 @@ code, not in a longer prompt.
 | "Cancel Thursday, book Friday" did only half | A "one question per reply" rule was read as "one thing per message" | Reworded the rule; gave the loop two more rounds |
 | Offered times when the clinic was closed | The model guessing hours | A check in the booking rules |
 | Wrote emojis and code in a spoken reply | The model formatting like a chat app | The output check strips them |
-| Added "that is also 9:00 AM in your local time" | Patient in the clinic's own zone, so it wrote the same time twice | Removed when patient is in the clinic zone, the one I fought three times, which taught the lesson above |
+| Added "that is also 9:00 AM in your local time" | Patient in the clinic's own zone, so it wrote the same time twice — and it returned once more when the patient's zone had a different name but the same clock (Singapore vs Taipei), which a zone-name comparison did not catch | Removed when the patient is in the clinic zone; the check compares the actual wall clock now, not the zone name. The one I fought four times, which taught the lesson above |
 
 ---
 
@@ -341,7 +341,6 @@ was booked, so the mistake is visible rather than hidden.
 | | |
 |---|---|
 | Time | 22 August to 3 September 2026 |
-| Commits | 73 |
 
 Here is a real scenario. The clinic gets **50 patients a day**, every one of them
 has a full conversation with the assistant, and it runs every day of the month.
@@ -367,7 +366,7 @@ September 2026 and the two outside AWS change often:
 
 | Service | How it charges | This clinic (~3–4k / month) |
 |---|---|---|
-| **Amazon SES** | $0.16 per 1,000, no monthly fee | **under $1** |
+| **Amazon SES** | $0.10 per 1,000, no monthly fee | **under $1** |
 | **Resend** | free up to 3,000 a month, then about $20 a month for 50,000 | **$0 to $20** |
 | **Mailgun** | paid plans from about $15 a month (10,000), about $35 for 50,000 | **about $15** |
 
@@ -402,15 +401,16 @@ treat them as the shape of the answer, not the exact cent:
 | Brain | Example model | AI per month | With server |
 |---|---|---|---|
 | **Cheap** | DeepSeek-V3, or Google Gemini Flash | about $10–15 | **about $40** |
-| **Cheap (OpenAI)** | GPT-5.6 Luna (what I tested with) | about $15 | about $45 |
-| **Low-middle** | Anthropic Claude Haiku | about $80 | about $110 |
+| **Cheap (OpenAI)** | GPT-5.6 Luna (what I tested with) | about $21 | about $48 |
+| **Low-middle** | Anthropic Claude Haiku | about $100 | about $127 |
 | **Middle (OpenAI)** | GPT-4o | about $240 | about $270 |
 | **Middle (Anthropic)** | Claude Sonnet | about $300 | about $330 |
-| **Top** | Claude Opus | about $1,490 | about $1,520 |
+| **Top** | Claude Opus | about $500 | about $527 |
 
-Two takeaways. The server is under 10% of the bill on anything above the cheapest
-brain, so the real cost choice is one line in the settings file, and correctness
-does not change down the column, because the model is not what decides. **Voice**, if
+Two takeaways. The server is a fixed cost of about $27 a month, so on a mid-tier
+brain or above it is under 10% of the bill, and the real cost choice is one line in
+the settings file. And correctness does not change down the column, because the
+model is not what decides. **Voice**, if
 switched on, is a separate bill, per minute of speech in, per character out. I
 tested it with OpenAI (Whisper to listen, tts-1 to speak); Deepgram and ElevenLabs
 are the alternative, ElevenLabs giving a more natural voice at a higher price.
@@ -421,17 +421,18 @@ Rates below are as of September 2026 and change often:
 | Speech → text | OpenAI Whisper (tested) | about $0.006 / minute | ~2 min ≈ $0.012 |
 | | Deepgram | about $0.007 / minute | ~2 min ≈ $0.015 |
 | Text → speech | OpenAI tts-1 (tested) | about $0.015 / 1,000 characters | ~900 chars ≈ $0.014 |
-| | ElevenLabs | about $0.15–0.20 / 1,000 characters | ~900 chars ≈ $0.15 |
+| | ElevenLabs | about $0.10 / 1,000 characters | ~900 chars ≈ $0.09 |
 
 The supplier choice swings this a lot:
 
 | Voice stack | Per voiced conversation | All 1,500 a month |
 |---|---|---|
 | OpenAI (what I tested) | about $0.03 | **about $40** |
-| Deepgram + ElevenLabs | about $0.17 | **about $250–300** |
+| Deepgram + ElevenLabs | about $0.10 | **about $150** |
 
 So on the cheaper stack voice adds about as much as a cheap brain; on the
-ElevenLabs stack it adds as much as a middle brain and can double the whole bill.
+ElevenLabs stack it adds about as much as a low-middle brain, and on a cheap setup
+that more than doubles the bill.
 That is why voice is a setting the clinic turns on, not something always running.
 ElevenLabs in particular bills by subscription credits rather than pure usage, so
 its real number depends on the plan; the figure here is the pay-as-you-go shape.
@@ -482,7 +483,7 @@ and re-sends the same invite id.
 **Interrupting the voice.** When voice is on, the patient waits for the assistant
 to finish speaking before they talk. Talking over it needs two-way audio streaming,
 which is a different and heavier design. Instead, the assistant ends its turn after
-1.6 seconds of silence, which is enough for a booking conversation. Next step:
+1.2 seconds of silence, which is enough for a booking conversation. Next step:
 full-duplex streaming only if the clinic wants a more natural back and forth.
 
 **Faster voice replies.** With voice on, the reply feels slower than typing, and
