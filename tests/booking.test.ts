@@ -192,7 +192,7 @@ class FakeRepo implements BookingRepository {
   }
   async insertBooking(b: NewBooking): Promise<Booking> {
     if (this.simulateRace) throw new DoubleBookingError();
-    const booking: Booking = { ...b, id: this.nextId++ };
+    const booking: Booking = { ...b, id: this.nextId++, createdAt: new Date() };
     this.bookings.push(booking);
     return booking;
   }

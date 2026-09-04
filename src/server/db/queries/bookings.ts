@@ -60,6 +60,7 @@ export async function getBookingsForPatientOnDay(
 
 export interface CancelledBooking {
   id: number;
+  createdAt: Date; // reproduces the same calendar UID the confirmation used
   professionalId: number;
   professionalName: string;
   serviceName: string;
@@ -87,6 +88,7 @@ export async function cancelBookingForPatient(
     )
     .returning({
       id: bookings.id,
+      createdAt: bookings.createdAt,
       professionalId: bookings.professionalId,
       serviceId: bookings.serviceId,
       start: bookings.startTime,
@@ -109,6 +111,7 @@ export async function cancelBookingForPatient(
 
   return {
     id: row.id,
+    createdAt: row.createdAt,
     professionalId: row.professionalId,
     professionalName: prof?.name ?? "your dentist",
     serviceName: svc?.name ?? "appointment",
@@ -137,8 +140,8 @@ export async function insertBooking(b: NewBooking): Promise<Booking> {
         patientName: b.patientName,
         patientEmail: b.patientEmail,
       })
-      .returning({ id: bookings.id });
-    return { ...b, id: rows[0].id };
+      .returning({ id: bookings.id, createdAt: bookings.createdAt });
+    return { ...b, id: rows[0].id, createdAt: rows[0].createdAt };
   } catch (err: unknown) {
     if (isExclusionViolation(err)) throw new DoubleBookingError();
     throw err;

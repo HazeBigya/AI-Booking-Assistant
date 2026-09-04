@@ -23,6 +23,36 @@ The assistant is set up as a dental clinic because that is the example it was
 built for, but nothing inside it is dental. The same product would work for a
 physiotherapy or eye clinic by changing the list of treatments and staff.
 
+## How it works
+
+A patient books the way they would talk to your front desk, in a few short
+messages. Here is a normal booking from start to finish:
+
+1. The patient opens your web page and says what they need — for example, "I'd
+   like a checkup next week."
+2. The assistant answers from your real information. It explains the treatment,
+   the price, and which dentists do it, and it offers only times you are actually
+   open.
+3. When the patient picks a time, the assistant asks for their email and sends a
+   6-digit code to it. They type the code back. This one step proves the email is
+   real, so the confirmation and the calendar invite have somewhere to go.
+4. The assistant books the time and emails a confirmation with a calendar invite
+   attached, so the appointment drops straight into the patient's calendar.
+
+Two things happen quietly that matter for a clinic. Before it promises any time,
+the assistant checks your live schedule, so it never offers a slot that is already
+taken or has already passed. And the booking is written so it cannot double-book:
+if two patients reach for the same slot in the same second, only one can win, and
+the other is offered a different time.
+
+The patient can also **speak instead of type**. With voice turned on they talk and
+the assistant talks back, and the booking works exactly the same way underneath —
+the same schedule, the same email check, the same invite.
+
+Everything runs on your own computer or server, so your patient list and your
+bookings stay with you. The only thing that leaves is the conversation itself,
+sent to the AI company that writes the replies — never your database.
+
 ## What a patient can do
 
 - Ask what a treatment is, what it costs, and who does it.

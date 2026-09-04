@@ -431,7 +431,10 @@ export async function runTool(
         try {
           const dentist = await getProfessionalContact(result.professional.id);
           await getMailer().sendInvite({
-            uid: `booking-${result.booking.id}@brightsmile`,
+            // id + creation time: unique per booking and stable for its life, so
+            // a cancel reproduces it, and a fresh database (ids restart at 1)
+            // never collides with an old cancelled event Google still remembers.
+            uid: `booking-${result.booking.id}-${result.booking.createdAt.getTime()}@brightsmile`,
             summary: `${result.service.name} with ${result.professional.name}`,
             description: `Your ${result.service.name} appointment at Bright Smile Clinic.`,
             start: result.booking.start,
@@ -490,7 +493,8 @@ export async function runTool(
       try {
         const dentist = await getProfessionalContact(cancelled.professionalId);
         await getMailer().sendInvite({
-          uid: `booking-${cancelled.id}@brightsmile`,
+          // Same UID the confirmation used, so this removes that exact event.
+          uid: `booking-${cancelled.id}-${cancelled.createdAt.getTime()}@brightsmile`,
           method: "CANCEL",
           sequence: 1,
           summary: `${cancelled.serviceName} with ${cancelled.professionalName}`,

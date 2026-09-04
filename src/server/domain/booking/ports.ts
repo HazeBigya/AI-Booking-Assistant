@@ -30,6 +30,11 @@ export interface NewBooking {
 
 export interface Booking extends NewBooking {
   id: number;
+  // When the row was created. Part of the calendar UID: the id alone resets to 1
+  // on a fresh database, and Google keys calendar events on UID forever per
+  // account — so a reused id makes a new invite look like an old cancelled one.
+  // The creation timestamp differs on every booking, which keeps the UID unique.
+  createdAt: Date;
 }
 
 // Thrown when the DB exclusion constraint rejects an overlap.

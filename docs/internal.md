@@ -277,6 +277,8 @@ code, not in a longer prompt.
 | Offered times when the clinic was closed | The model guessing hours | A check in the booking rules |
 | Wrote emojis and code in a spoken reply | The model formatting like a chat app | The output check strips them |
 | Added "that is also 9:00 AM in your local time" | Patient in the clinic's own zone, so it wrote the same time twice — and it returned once more when the patient's zone had a different name but the same clock (Singapore vs Taipei), which a zone-name comparison did not catch | Removed when the patient is in the clinic zone; the check compares the actual wall clock now, not the zone name. The one I fought four times, which taught the lesson above |
+| The confirmation email showed "Event cancelled" in Gmail | The calendar id was `booking-<id>`, and ids restart at 1 on a fresh database — so a new booking reused the id of an old one I had cancelled, which Google remembers as cancelled forever per account | The id now includes the booking's creation time, so it is unique to that booking and never reused across bookings or database resets |
+| The spoken reply felt slow — the text appeared, then the voice arrived a beat later | Three steps ran in sequence (speech to text, then the model, then text to speech), and the browser fetched the reply text first and the audio separately, one request per sentence | One streaming request now sends each sentence's text and audio together, revealed in step as it plays, so the words and the voice arrive at the same time and the first sentence plays while the next is still being made |
 
 ---
 
@@ -485,18 +487,6 @@ to finish speaking before they talk. Talking over it needs two-way audio streami
 which is a different and heavier design. Instead, the assistant ends its turn after
 1.2 seconds of silence, which is enough for a booking conversation. Next step:
 full-duplex streaming only if the clinic wants a more natural back and forth.
-
-**Faster voice replies.** With voice on, the reply feels slower than typing, and
-the reason is the shape of the pipeline. It runs three steps one after another and
-waits for each to finish: it turns the whole recording into text, sends that text
-to the brain and waits for the full reply, then turns the whole reply into speech
-before any sound plays. Each step is a separate request to an outside company, so
-the waits stack up, and on top of that the assistant first waits 1.6 seconds of
-silence to be sure the patient has stopped talking. Next step: stream the steps
-into each other, so speech starts playing as soon as the first words of the reply
-are ready instead of after the whole reply, and move to a faster voice model or a
-single speech-to-speech service that does listening, thinking and speaking in one
-stream. This is the change a patient would feel the most.
 
 **Connected staff calendars.** The patient gets a calendar invite that names both
 the patient and the dentist, and it works with no accounts connected. What is not
