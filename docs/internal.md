@@ -253,15 +253,29 @@ Chen free on Thursday?", it cannot guess, it calls `check_availability` and read
 back the list. The 8-round limit stops a confused model calling tools forever at
 the clinic's expense.
 
-Two checks keep it honest. Facts are read the moment they are spoken, so nothing
-is out of date. And every reply is compared with what the tools returned, so a
-booking the model claims but never made never reaches the patient.
+Two checks keep it honest. First, the assistant never answers from memory — every
+fact, like a free time or a price, is looked up with a tool the moment it is said,
+so it is always current. Second, the code checks the reply before the patient sees
+it: if the assistant says an appointment is booked but nothing was actually saved
+to the database, that reply is blocked. So it can never tell a patient they are
+booked when they are not.
 
 **No second AI checks the first.** That would be one guessing model checking
 another, at double the cost. My check is plain code that already knows whether
 `create_booking` saved a row, a fact beats an opinion, and it is cheaper. A judge
 model only earns its place offline, grading tone over old conversations before a
 model switch, not on every reply.
+
+**Why not a framework like LangGraph.** This loop is the same shape as a graph
+framework such as LangGraph: call the model, run any tools it asks for, loop, then
+check the answer. LangGraph is built for large agents with many branches, several
+sub-agents, and steps that pause and resume. This is a short, straight loop, about
+40 lines, and the two parts that actually matter — the reply check above and the
+swap-any-AI-company design in section 1.4 — are code I would write either way, so a
+framework would not remove them. It would only add a large, Python-first dependency
+to a TypeScript app whose whole point is not being tied to one supplier. For a
+bigger, branchier agent I would reach for LangGraph; for a booking loop this size
+it would be overkill.
 
 ## 2.1 Problems I ran into, and how I fixed them
 
@@ -340,9 +354,16 @@ was booked, so the mistake is visible rather than hidden.
 
 ## To build
 
-| | |
-|---|---|
-| Time | 22 August to 3 September 2026 |
+Building and testing it cost about **$7 in total**: $5 of OpenAI credit and $2 on
+DeepSeek, spent while developing the assistant and trying it out. Nothing else cost
+anything — every other service ran on a free tier, and the app and its database ran
+on my own machine, so there was no server bill. The test suite runs locally and
+calls no paid service, so it adds nothing.
+
+## To run in production
+
+Everything below is the cost of running it for a real clinic. That is the ongoing
+bill, and a different thing from the one-off build cost above.
 
 Here is a real scenario. The clinic gets **50 patients a day**, every one of them
 has a full conversation with the assistant, and it runs every day of the month.
@@ -372,10 +393,11 @@ September 2026 and the two outside AWS change often:
 | **Resend** | free up to 3,000 a month, then about $20 a month for 50,000 | **$0 to $20** |
 | **Mailgun** | paid plans from about $15 a month (10,000), about $35 for 50,000 | **about $15** |
 
-**My pick is Amazon SES.** The clinic is already on AWS, so SES needs no new
-account and no new bill, it authenticates with the same AWS credentials the
-server already has, and at this volume it is under a dollar. Resend is the easiest
-to wire up and is what I would reach for outside AWS, but its free tier stops at
+**My pick is Amazon SES.** It is the cheapest way to send at this volume — $0.10
+per 1,000, so under a dollar a month here — and a fair place to start. It
+authenticates with AWS credentials, so it is simplest when the app is hosted on
+AWS; that is my own assumption for this build, not a requirement. Off AWS, Resend
+is the easiest to wire up and what I would reach for, though its free tier stops at
 3,000, just under this clinic's volume.
 
 **As the load grows, Mailgun becomes the better one.** Its flat plans include the
@@ -405,9 +427,10 @@ treat them as the shape of the answer, not the exact cent:
 | **Cheap** | DeepSeek-V3, or Google Gemini Flash | about $10–15 | **about $40** |
 | **Cheap (OpenAI)** | GPT-5.6 Luna (what I tested with) | about $21 | about $48 |
 | **Low-middle** | Anthropic Claude Haiku | about $100 | about $127 |
-| **Middle (OpenAI)** | GPT-4o | about $240 | about $270 |
+| **Middle (OpenAI)** | GPT-5.6 Terra | about $210 | about $240 |
 | **Middle (Anthropic)** | Claude Sonnet | about $300 | about $330 |
-| **Top** | Claude Opus | about $500 | about $527 |
+| **Top (OpenAI)** | GPT-5.6 Sol | about $525 | about $550 |
+| **Top (Anthropic)** | Claude Opus | about $500 | about $530 |
 
 Two takeaways. The server is a fixed cost of about $27 a month, so on a mid-tier
 brain or above it is under 10% of the bill, and the real cost choice is one line in
@@ -415,13 +438,15 @@ the settings file. And correctness does not change down the column, because the
 model is not what decides. **Voice**, if
 switched on, is a separate bill, per minute of speech in, per character out. I
 tested it with OpenAI (Whisper to listen, tts-1 to speak); Deepgram and ElevenLabs
-are the alternative, ElevenLabs giving a more natural voice at a higher price.
+are the alternatives, and each can both listen and speak — ElevenLabs gives a more
+natural voice at a higher price.
 Rates below are as of September 2026 and change often:
 
 | Part | Supplier | Rate | Per voiced conversation |
 |---|---|---|---|
 | Speech → text | OpenAI Whisper (tested) | about $0.006 / minute | ~2 min ≈ $0.012 |
 | | Deepgram | about $0.007 / minute | ~2 min ≈ $0.015 |
+| | ElevenLabs Scribe | about $0.22 / hour (~$0.004 / min) | ~2 min ≈ $0.007 |
 | Text → speech | OpenAI tts-1 (tested) | about $0.015 / 1,000 characters | ~900 chars ≈ $0.014 |
 | | ElevenLabs | about $0.10 / 1,000 characters | ~900 chars ≈ $0.09 |
 
@@ -447,9 +472,17 @@ I handle all of it the same way: read the error the company sends back and react
 to that, instead of keeping my own list of model names and settings that goes
 stale the day I write it.
 
-Normal maintenance is updating libraries and checking prices. Nothing runs in the
-background that needs watching, and the database is the only thing holding data,
-so backups are the only real operations work.
+Normal maintenance is updating libraries and checking prices. A real production
+deployment adds three standing operations jobs. First, a **regular database
+backup**: the database is the only thing holding patient records and bookings, so
+it is the one part that must be recoverable, taken on a schedule and restored on a
+test copy now and then to prove it works. Second, **logging** kept somewhere it
+survives a restart, so a failed booking or a bad login can be traced after the
+fact. Third, an **observability tool** — CloudWatch, Grafana or Sentry — so
+errors, slow replies and the AI spend show up on a dashboard and raise an alert,
+rather than being discovered from a patient's complaint. None of these change the
+app; they are the operations work that turns a working demo into something safe to
+run for real.
 
 ---
 

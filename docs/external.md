@@ -28,16 +28,15 @@ physiotherapy or eye clinic by changing the list of treatments and staff.
 A patient books the way they would talk to your front desk, in a few short
 messages. Here is a normal booking from start to finish:
 
-1. The patient opens your web page and says what they need — for example, "I'd
-   like a checkup next week."
-2. The assistant answers from your real information. It explains the treatment,
-   the price, and which dentists do it, and it offers only times you are actually
-   open.
-3. When the patient picks a time, the assistant asks for their email and sends a
-   6-digit code to it. They type the code back. This one step proves the email is
-   real, so the confirmation and the calendar invite have somewhere to go.
-4. The assistant books the time and emails a confirmation with a calendar invite
-   attached, so the appointment drops straight into the patient's calendar.
+- The patient opens your web page and says what they need — for example, "I'd like
+  a checkup next week."
+- The assistant answers from your real information. It explains the treatment, the
+  price, and which dentists do it, and it offers only times you are actually open.
+- When the patient picks a time, the assistant asks for their email and sends a
+  6-digit code to it. They type the code back. This one step proves the email is
+  real, so the confirmation and the calendar invite have somewhere to go.
+- The assistant books the time and emails a confirmation with the calendar invite
+  attached, so the appointment drops straight into the patient's calendar.
 
 Two things happen quietly that matter for a clinic. Before it promises any time,
 the assistant checks your live schedule, so it never offers a slot that is already
@@ -65,6 +64,33 @@ sent to the AI company that writes the replies — never your database.
 When a patient books, the assistant sends a calendar invite to their email, so
 the appointment drops straight into their calendar.
 
+## Typing and talking
+
+A patient can use the assistant two ways and switch between them at any time in the
+same conversation.
+
+**Typing.** They type a message and press send, like any chat. The reply comes back
+as text and stays silent — someone who is reading did not ask to be spoken to. If
+they do want to hear a particular reply, each reply has a small **Listen** button
+that reads it aloud on demand.
+
+**Talking.** When voice is turned on there is a microphone button. The patient
+presses it, speaks, and the assistant both writes and speaks its reply — the words
+appear on screen at the same time as the voice, not before it. They do not have to
+press anything to stop recording: the assistant hears a short pause and takes its
+turn. To end sooner, pressing the microphone again sends what they said right away.
+
+The two modes mix the way a real conversation does:
+
+- If the assistant is speaking and the patient starts **typing**, it stops talking
+  and listens — typing over someone is how a person says "I've got it."
+- If the assistant is speaking and the patient presses the **microphone**, it also
+  stops talking, so its own voice is never recorded as the patient's next question.
+- Starting a **new conversation** stops any reply still being spoken.
+
+When voice is not turned on (no voice key set), the microphone and the Listen
+button are both hidden, and the whole thing works by text.
+
 ## What it will not do
 
 This is on purpose, and it is what keeps the assistant safe to put in front of
@@ -77,6 +103,11 @@ patients.
 - It cannot book an appointment under someone else's name. A patient can only see
   and change their own bookings.
 - It does not give medical advice.
+- It only helps with this clinic's treatments and appointments. If a patient asks
+  for something outside that — the score of a football match, or to write a file —
+  it will not try. It replies that it is the clinic's dental booking assistant and
+  cannot help with that. It can only do what its booking tools allow, and there is
+  no tool for anything else.
 - It cannot yet move an appointment. To change one, the patient cancels it and
   books a new time.
 
